@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GojoShop.et — Support Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d26;
+      --surface2: #22263a;
+      --surface3: #2c3048;
+      --border:   rgba(255,255,255,0.07);
+      --accent:   #10b981;
+      --accent-d: #047857;
+      --blue:     #3b82f6;
+      --blue-d:   #1d4ed8;
+      --text:     #e8ecf4;
+      --text-s:   #9aa3b8;
+      --red:      #ef4444;
+      --orange:   #f59e0b;
+      --green:    #22c55e;
+      --radius:   12px;
+      --radius-sm: 8px;
+    }
+
+    html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Layout ── */
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Left Panel: Ticket List ── */
+    .sidebar {
+      width: 380px;
+      min-width: 320px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #1a1d26, #22263a);
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .brand-dot {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-d), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 16px; color: #fff;
+    }
+    .brand-title { font-size: 16px; font-weight: 700; }
+    .brand-sub { font-size: 11px; color: var(--text-s); margin-top: 1px; }
+
+    .stats-row { display: flex; gap: 8px; }
+    .stat-chip {
+      flex: 1; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 4px;
+      font-size: 11px; color: var(--text-s);
+    }
+    .stat-chip strong { display: block; font-size: 18px; font-weight: 700; color: var(--text); }
+    .stat-chip.open strong  { color: var(--orange); }
+    .stat-chip.prog strong  { color: var(--blue); }
+    .stat-chip.done strong  { color: var(--green); }
+
+    .filter-bar {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 6px;
+    }
+
+    .filter-pill {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--text-s);
+      cursor: pointer; transition: all 0.18s;
+    }
+    .filter-pill.active, .filter-pill:hover {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+
+    .ticket-list { flex: 1; overflow-y: auto; }
+
+    .ticket-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .ticket-item:hover { background: var(--surface2); }
+    .ticket-item.selected { background: var(--surface2); border-left: 3px solid var(--blue); }
+
+    .ticket-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .ticket-id { font-size: 11px; font-weight: 700; color: var(--text-s); }
+    .ticket-badge {
+      padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto;
+    }
+    .badge-open       { background: rgba(245,158,11,0.15); color: var(--orange); }
+    .badge-in_progress{ background: rgba(59,130,246,0.15); color: var(--blue); }
+    .badge-resolved   { background: rgba(34,197,94,0.15);  color: var(--green); }
+
+    .ticket-user { font-size: 13px; font-weight: 600; color: var(--text); }
+    .ticket-preview { font-size: 12px; color: var(--text-s); line-height: 1.4; margin-top: 3px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ticket-time { font-size: 11px; color: var(--text-s); margin-top: 5px; }
+
+    .unread-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--blue);
+      position: absolute; top: 14px; right: 14px;
+    }
+
+    .empty-list { padding: 40px 20px; text-align: center; color: var(--text-s); font-size: 13px; }
+    .empty-list .icon { font-size: 32px; margin-bottom: 10px; }
+
+    .refresh-bar {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .refresh-label { font-size: 11px; color: var(--text-s); }
+    .refresh-btn {
+      background: var(--surface3); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; cursor: pointer; transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: var(--surface2); }
+
+    /* ── Right Panel: Chat ── */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      min-width: 0;
+    }
+
+    .chat-placeholder {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--text-s); text-align: center; gap: 12px;
+    }
+    .chat-placeholder .ph-icon { font-size: 48px; opacity: 0.4; }
+    .chat-placeholder h2 { font-size: 18px; font-weight: 600; color: var(--text); }
+    .chat-placeholder p  { font-size: 13px; max-width: 280px; line-height: 1.6; }
+
+    .chat-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .chat-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue-d), var(--blue));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+
+    .chat-header-info { flex: 1; min-width: 0; }
+    .chat-header-name { font-size: 14px; font-weight: 700; }
+    .chat-header-sub  { font-size: 12px; color: var(--text-s); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    .online-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse-dot 1.4s infinite; }
+    @keyframes pulse-dot { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:0.5; transform:scale(1.3); } }
+
+    .chat-header-actions { display: flex; gap: 8px; }
+    .action-btn {
+      padding: 6px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
+    }
+    .btn-start    { background: rgba(59,130,246,0.12); color: var(--blue);   border-color: rgba(59,130,246,0.3); }
+    .btn-resolve  { background: rgba(34,197,94,0.12);  color: var(--green);  border-color: rgba(34,197,94,0.3); }
+    .btn-reopen   { background: rgba(245,158,11,0.12); color: var(--orange); border-color: rgba(245,158,11,0.3); }
+    .btn-start:hover   { background: var(--blue-d); color: #fff; border-color: var(--blue-d); }
+    .btn-resolve:hover { background: #166534; color: #fff; border-color: #166534; }
+    .btn-reopen:hover  { background: #92400e; color: #fff; border-color: #92400e; }
+
+    .chat-messages-area {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .msg-bubble {
+      max-width: 70%; display: flex; flex-direction: column; gap: 4px;
+    }
+    .msg-bubble.user-side  { align-self: flex-end; align-items: flex-end; }
+    .msg-bubble.agent-side { align-self: flex-start; align-items: flex-start; }
+
+    .msg-sender { font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; }
+    .msg-bubble.user-side  .msg-sender { color: var(--accent); }
+    .msg-bubble.agent-side .msg-sender { color: var(--blue); }
+
+    .msg-text {
+      padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.5;
+    }
+    .msg-bubble.user-side  .msg-text {
+      background: linear-gradient(135deg, var(--accent-d), var(--accent));
+      color: #fff; border-radius: 14px 14px 4px 14px;
+    }
+    .msg-bubble.agent-side .msg-text {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 14px 14px 14px 4px;
+    }
+
+    .msg-time { font-size: 10px; color: var(--text-s); }
+
+    .context-panel {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      font-size: 11.5px; color: var(--text-s);
+      display: flex; gap: 20px; flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .ctx-item { display: flex; gap: 5px; }
+    .ctx-label { font-weight: 600; color: var(--text); }
+
+    .chat-input-area {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; gap: 10px; align-items: center;
+      flex-shrink: 0;
+    }
+
+    .agent-input {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 22px; padding: 10px 18px;
+      font-family: inherit; font-size: 13.5px; outline: none; resize: none;
+      transition: border-color 0.2s;
+    }
+    .agent-input:focus { border-color: rgba(59,130,246,0.5); }
+    .agent-input::placeholder { color: var(--text-s); }
+
+    .send-btn {
+      width: 42px; height: 42px; border-radius: 50%; border: none;
+      background: linear-gradient(135deg, var(--blue-d), var(--blue));
+      color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 14px rgba(59,130,246,0.35); flex-shrink: 0;
+    }
+    .send-btn:hover   { transform: scale(1.06); box-shadow: 0 6px 20px rgba(59,130,246,0.45); }
+    .send-btn:active  { transform: scale(0.95); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .send-btn svg { width: 18px; height: 18px; margin-left: 2px; }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+    @media (max-width: 700px) {
+      .sidebar { width: 100%; min-width: 0; }
+      .layout { flex-direction: column; }
+      .chat-panel { display: none; }
+      .layout.chat-open .chat-panel { display: flex; }
+      .layout.chat-open .sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout" id="layout">
+
+  <!-- ── LEFT: Ticket Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-dot">G</div>
+        <div>
+          <div class="brand-title">Support Dashboard</div>
+          <div class="brand-sub">GojoShop.et · Live Chat</div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-chip open">  <strong id="openCount">0</strong>Open</div>
+        <div class="stat-chip prog">  <strong id="progCount">0</strong>Active</div>
+        <div class="stat-chip done">  <strong id="doneCount">0</strong>Resolved</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-pill active" data-filter="all">All</button>
+      <button class="filter-pill" data-filter="open">Open</button>
+      <button class="filter-pill" data-filter="in_progress">Active</button>
+      <button class="filter-pill" data-filter="resolved">Resolved</button>
+    </div>
+
+    <div class="ticket-list" id="ticketList">
+      <div class="empty-list">
+        <div class="icon">💬</div>
+        <p>Loading support requests…</p>
+      </div>
+    </div>
+
+    <div class="refresh-bar">
+      <span class="refresh-label" id="lastRefreshed">Auto-refreshes every 10s</span>
+      <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
+    </div>
+  </aside>
+
+  <!-- ── RIGHT: Chat Panel ── -->
+  <main class="chat-panel" id="chatPanel">
+    <div class="chat-placeholder" id="chatPlaceholder">
+      <div class="ph-icon">🎧</div>
+      <h2>Select a support request</h2>
+      <p>Click on a ticket on the left to open the live chat with a customer.</p>
+    </div>
+
+    <!-- Active chat UI (hidden until ticket selected) -->
+    <div id="activeChatUI" style="display:none; flex-direction:column; flex:1; min-height:0;">
+      <div class="chat-header" id="chatHeader">
+        <div class="chat-avatar" id="chatAvatar">👤</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="chatName">—</div>
+          <div class="chat-header-sub">
+            <span class="online-dot" id="onlineDot" style="display:none"></span>
+            <span id="chatSub">Ticket —</span>
+          </div>
+        </div>
+        <div class="chat-header-actions" id="chatActions"></div>
+      </div>
+
+      <div class="chat-messages-area" id="chatMessagesArea"></div>
+
+      <div class="context-panel" id="contextPanel" style="display:none">
+        <div class="ctx-item"><span class="ctx-label">Intent:</span><span id="ctxIntent">—</span></div>
+        <div class="ctx-item"><span class="ctx-label">Order:</span><span id="ctxOrder">—</span></div>
+        <div class="ctx-item"><span class="ctx-label">Search:</span><span id="ctxSearch">—</span></div>
+        <div class="ctx-item"><span class="ctx-label">Cart:</span><span id="ctxCart">—</span></div>
+      </div>
+
+      <div class="chat-input-area" id="chatInputArea">
+        <input type="text" class="agent-input" id="agentInput" placeholder="Type a reply to the customer…" autocomplete="off" />
+        <button class="send-btn" id="agentSendBtn" title="Send reply">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ── Utils ── */
+function esc(v) {
+  return String(v ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  return new Date(v).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+function fmtTime(v) {
+  if (!v) return '';
+  return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function badgeClass(s) {
+  return { open: 'badge-open', in_progress: 'badge-in_progress', resolved: 'badge-resolved' }[s] || 'badge-open';
+}
+function badgeLabel(s) {
+  return { open: 'Open', in_progress: 'Active', resolved: 'Resolved' }[s] || s;
+}
+
+/* ── State ── */
+let allRequests = [];
+let activeFilter = 'all';
+let selectedId = null;
+let pollInterval = null;
+let lastMsgCount = 0;
+
+/* ── DOM refs ── */
+const ticketList      = document.getElementById('ticketList');
+const chatPlaceholder = document.getElementById('chatPlaceholder');
+const activeChatUI    = document.getElementById('activeChatUI');
+const chatName        = document.getElementById('chatName');
+const chatSub         = document.getElementById('chatSub');
+const chatAvatar      = document.getElementById('chatAvatar');
+const onlineDot       = document.getElementById('onlineDot');
+const chatActions     = document.getElementById('chatActions');
+const chatMessagesArea= document.getElementById('chatMessagesArea');
+const contextPanel    = document.getElementById('contextPanel');
+const agentInput      = document.getElementById('agentInput');
+const agentSendBtn    = document.getElementById('agentSendBtn');
+const openCount       = document.getElementById('openCount');
+const progCount       = document.getElementById('progCount');
+const doneCount       = document.getElementById('doneCount');
+const lastRefreshed   = document.getElementById('lastRefreshed');
+
+/* ── Load tickets ── */
+async function loadRequests() {
+  try {
+    const res = await fetch('/api/support/requests');
+    const data = await res.json();
+    allRequests = (data.requests || []).slice().reverse();
+    renderStats();
+    renderList();
+    if (selectedId) refreshChat(selectedId);
+    lastRefreshed.textContent = 'Refreshed at ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  } catch (e) {
+    console.error('Load error:', e);
+  }
+}
+
+function renderStats() {
+  const c = { open: 0, in_progress: 0, resolved: 0 };
+  allRequests.forEach(r => { c[r.status || 'open'] = (c[r.status || 'open'] || 0) + 1; });
+  openCount.textContent = c.open;
+  progCount.textContent = c.in_progress;
+  doneCount.textContent = c.resolved;
+}
+
+function renderList() {
+  const visible = activeFilter === 'all'
+    ? allRequests
+    : allRequests.filter(r => (r.status || 'open') === activeFilter);
+
+  if (!visible.length) {
+    ticketList.innerHTML = `<div class="empty-list"><div class="icon">🎧</div><p>No tickets match this filter.</p></div>`;
+    return;
+  }
+
+  ticketList.innerHTML = visible.map(req => {
+    const status = req.status || 'open';
+    const isActive = status === 'open' || status === 'in_progress';
+    const isSelected = req.id === selectedId;
+    const unreadDot = isActive && req.id !== selectedId ? '<div class="unread-dot"></div>' : '';
+    return `
+      <div class="ticket-item${isSelected ? ' selected' : ''}" data-id="${esc(req.id)}">
+        ${unreadDot}
+        <div class="ticket-top">
+          <span class="ticket-id">${esc(req.id)}</span>
+          <span class="ticket-badge ${badgeClass(status)}">${badgeLabel(status)}</span>
+        </div>
+        <div class="ticket-user">👤 ${esc(req.user_id)}</div>
+        <div class="ticket-preview">${esc(req.message)}</div>
+        <div class="ticket-time">${fmtDate(req.timestamp)}</div>
+      </div>`;
+  }).join('');
+
+  ticketList.querySelectorAll('.ticket-item').forEach(el => {
+    el.addEventListener('click', () => selectTicket(el.dataset.id));
+  });
+}
+
+/* ── Select / open ticket ── */
+function selectTicket(id) {
+  selectedId = id;
+  const req = allRequests.find(r => r.id === id);
+  if (!req) return;
+
+  // Update list selection style
+  document.querySelectorAll('.ticket-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === id);
+    if (el.dataset.id === id) { const ud = el.querySelector('.unread-dot'); if(ud) ud.remove(); }
+  });
+
+  // Show chat UI
+  chatPlaceholder.style.display = 'none';
+  activeChatUI.style.display = 'flex';
+
+  const status = req.status || 'open';
+  const isActive = status === 'open' || status === 'in_progress';
+
+  chatName.textContent = req.user_id;
+  chatSub.textContent = `${req.id} · ${fmtDate(req.timestamp)}`;
+  onlineDot.style.display = isActive ? 'block' : 'none';
+  chatAvatar.textContent = '👤';
+
+  // Action buttons
+  chatActions.innerHTML = `
+    ${status !== 'in_progress' && status !== 'resolved' ? `<button class="action-btn btn-start" data-id="${esc(id)}" data-status="in_progress">▶ Start</button>` : ''}
+    ${status !== 'resolved' ? `<button class="action-btn btn-resolve" data-id="${esc(id)}" data-status="resolved">✓ Resolve</button>` : ''}
+    ${status === 'resolved' ? `<button class="action-btn btn-reopen" data-id="${esc(id)}" data-status="open">↩ Reopen</button>` : ''}
+  `;
+  chatActions.querySelectorAll('.action-btn').forEach(btn => {
+    btn.addEventListener('click', () => updateStatus(btn.dataset.id, btn.dataset.status));
+  });
+
+  // Context panel
+  contextPanel.style.display = 'flex';
+  document.getElementById('ctxIntent').textContent = req.last_intent || '—';
+  document.getElementById('ctxOrder').textContent  = req.last_order_id || '—';
+  document.getElementById('ctxSearch').textContent = req.last_search_keyword || '—';
+  document.getElementById('ctxCart').textContent   = (req.cart || []).join(', ') || '—';
+
+  // Input only enabled when active
+  agentInput.disabled = !isActive;
+  agentSendBtn.disabled = !isActive;
+  agentInput.placeholder = isActive ? 'Type a reply to the customer…' : 'Ticket is resolved — reopen to reply';
+
+  // Load messages
+  loadMessages(id);
+  startPolling(id);
+}
+
+/* ── Load chat messages ── */
+async function loadMessages(id) {
+  try {
+    const res = await fetch(`/api/support/requests/${encodeURIComponent(id)}/messages`);
+    const data = await res.json();
+    renderMessages(data.messages || []);
+    lastMsgCount = (data.messages || []).length;
+  } catch (e) {
+    console.error('Load messages error:', e);
+  }
+}
+
+function renderMessages(messages) {
+  chatMessagesArea.innerHTML = messages.map(msg => {
+    const isUser = msg.sender === 'user';
+    const label = isUser ? '🧑 Customer' : '🎧 Agent';
+    return `
+      <div class="msg-bubble ${isUser ? 'user-side' : 'agent-side'}">
+        <div class="msg-sender">${label}</div>
+        <div class="msg-text">${esc(msg.text)}</div>
+        <div class="msg-time">${fmtTime(msg.timestamp)}</div>
+      </div>`;
+  }).join('');
+  chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+}
+
+/* ── Polling for new messages ── */
+function startPolling(id) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(() => refreshChat(id), 3000);
+}
+
+async function refreshChat(id) {
+  if (id !== selectedId) return;
+  try {
+    const res = await fetch(`/api/support/requests/${encodeURIComponent(id)}/messages`);
+    const data = await res.json();
+    const messages = data.messages || [];
+    if (messages.length !== lastMsgCount) {
+      renderMessages(messages);
+      lastMsgCount = messages.length;
+    }
+  } catch(e) {}
+}
+
+/* ── Send agent message ── */
+async function sendAgentMessage() {
+  const text = agentInput.value.trim();
+  if (!text || !selectedId) return;
+  agentInput.value = '';
+  agentSendBtn.disabled = true;
+  try {
+    await fetch(`/api/support/requests/${encodeURIComponent(selectedId)}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    await loadMessages(selectedId);
+  } catch(e) {
+    console.error('Send error:', e);
+  } finally {
+    agentSendBtn.disabled = false;
+    agentInput.focus();
+  }
+}
+
+/* ── Status update ── */
+async function updateStatus(id, status) {
+  await fetch(`/api/support/requests/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  await loadRequests();
+  // Re-select to refresh header actions
+  if (selectedId === id) selectTicket(id);
+}
+
+/* ── Filter pills ── */
+document.querySelectorAll('.filter-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    activeFilter = pill.dataset.filter;
+    renderList();
+  });
+});
+
+/* ── Send button & Enter key ── */
+agentSendBtn.addEventListener('click', sendAgentMessage);
+agentInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAgentMessage(); } });
+
+/* ── Refresh button ── */
+document.getElementById('refreshBtn').addEventListener('click', loadRequests);
+
+/* ── Bootstrap ── */
+loadRequests();
+setInterval(loadRequests, 10000);
+</script>
+</body>
+</html>

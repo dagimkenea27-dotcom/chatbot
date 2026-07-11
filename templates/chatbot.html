@@ -1,0 +1,1729 @@
+<!-- templates/chatbot.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GojoShop.et — Smart Shopping Assistant</title>
+  <meta name="description" content="Chat with GojoShop.et's AI assistant for product help, order tracking, and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #f0fdf8;
+      --surface:      #ffffff;
+      --surface2:     #f4faf7;
+      --surface3:     #ffffff;
+      --border:       rgba(4,120,87,0.12);
+      --border-hover: rgba(16,185,129,0.45);
+      --accent:       #10b981;
+      --accent-light: #059669;
+      --accent-dark:  #047857;
+      --accent-glow:  rgba(16,185,129,0.12);
+      --text:         #134e3a;
+      --text-soft:    #1f4d3d;
+      --text-muted:   #6b8f7a;
+      --user-bg:      linear-gradient(135deg, #065f46 0%, #10b981 100%);
+      --bot-bg:       #ffffff;
+      --green:        #16a34a;
+      --yellow:       #d97706;
+      --red:          #dc2626;
+      --blue:         #2563eb;
+      --radius-sm:    10px;
+      --radius:       16px;
+      --radius-lg:    22px;
+      --shadow:       0 20px 50px rgba(4,120,87,0.12), 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(16,185,129,0.14) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 50% at 95% 100%, rgba(4,120,87,0.10) 0%, transparent 50%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+    }
+
+    /* Shell */
+    .chat-wrap {
+      width: 100%;
+      max-width: 520px;
+      height: calc(100vh - 32px);
+      max-height: 820px;
+      display: flex;
+      flex-direction: column;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: var(--shadow), 0 0 0 1px var(--border), 0 0 80px var(--accent-glow);
+      position: relative;
+    }
+
+    /* Header */
+    .chat-header {
+      padding: 16px 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fffb 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #047857, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(16,185,129,0.35);
+      letter-spacing: -0.5px;
+    }
+
+    .header-info h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    .header-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 3px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+      animation: pulse-dot 2.2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+      70%  { box-shadow: 0 0 0 7px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+
+    .header-actions { margin-left: auto; }
+
+    .header-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .header-btn:hover {
+      background: rgba(239,68,68,0.12);
+      color: var(--red);
+      border-color: rgba(239,68,68,0.3);
+    }
+
+    .header-btn svg { width: 16px; height: 16px; }
+
+    /* Messages */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+      background: #fafdfc;
+    }
+
+    .chat-messages::-webkit-scrollbar { width: 5px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(16,185,129,0.25);
+      border-radius: 4px;
+    }
+
+    .date-sep {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      position: relative;
+      margin: 4px 0 2px;
+    }
+
+    .date-sep::before, .date-sep::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 30%;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .date-sep::before { left: 0; }
+    .date-sep::after  { right: 0; }
+
+    /* Message rows */
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      animation: msg-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .msg-row.user { flex-direction: row-reverse; }
+    .msg-row.wide { align-items: flex-start; }
+    .msg-row.wide .bot-content { max-width: 100%; width: 100%; }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .bot-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #047857, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .bot-content { max-width: 82%; min-width: 0; }
+
+    .msg-row.user .bot-content { max-width: 78%; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      line-height: 1.6;
+      font-size: 14px;
+      word-break: break-word;
+    }
+
+    .msg-row.user .bubble {
+      background: var(--user-bg);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 20px rgba(16,185,129,0.25);
+    }
+
+    .msg-row.bot .bubble {
+      background: var(--bot-bg);
+      color: var(--text-soft);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(4,120,87,0.06);
+    }
+
+    .bubble strong { color: var(--text); font-weight: 600; }
+
+    .bubble code {
+      background: rgba(16,185,129,0.1);
+      color: var(--accent-dark);
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 12.5px;
+      font-family: 'DM Sans', monospace;
+    }
+
+    /* Welcome card */
+    .welcome-card {
+      background: var(--bot-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      overflow: hidden;
+    }
+
+    .welcome-hero {
+      padding: 16px 16px 12px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(240,253,248,0.9));
+      border-bottom: 1px solid var(--border);
+    }
+
+    .welcome-hero h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .welcome-hero p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px;
+      background: #f8fffb;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.4;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .feature-item:hover {
+      border-color: var(--border-hover);
+      background: #f0fdf8;
+    }
+
+    .feature-icon {
+      font-size: 16px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .welcome-cta {
+      padding: 0 16px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Order card */
+    .order-card {
+      background: #f8fffb;
+      border: 1px solid rgba(16,185,129,0.2);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(4,120,87,0.05);
+    }
+
+    .order-card .oc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 12px;
+    }
+
+    .order-card .oc-label {
+      color: var(--text-muted);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+
+    .order-card .oc-val { font-weight: 600; color: var(--text); font-size: 13px; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .status-delivered  { background: rgba(34,197,94,0.12); color: #15803d; }
+    .status-shipped    { background: rgba(37,99,235,0.1);  color: #1d4ed8; }
+    .status-processing { background: rgba(217,119,6,0.12);  color: #b45309; }
+    .status-pending    { background: rgba(100,116,139,0.1); color: #475569; }
+    .status-cancelled  { background: rgba(220,38,38,0.1);   color: #b91c1c; }
+
+    .oc-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+    .oc-items-list { list-style: none; }
+    .oc-items-list li {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      padding: 4px 0;
+      color: var(--text-soft);
+    }
+    .oc-total { font-size: 15px; font-weight: 700; color: var(--accent-dark); }
+
+    .ts {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      padding: 0 2px;
+    }
+
+    .msg-row.user .ts { text-align: right; }
+
+    /* Human support card */
+    .support-card {
+      background: linear-gradient(135deg, #fffbeb, #ffffff);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13px;
+      max-width: 320px;
+    }
+
+    .support-intro {
+      margin: 0 0 12px;
+      color: var(--text-soft);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .support-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .support-badge {
+      font-weight: 700;
+      color: #b45309;
+      font-size: 13px;
+    }
+
+    .support-shop {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .support-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .support-btn {
+      flex: 1;
+      text-align: center;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .support-btn.email {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+
+    .support-btn.phone {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+
+    .support-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+
+    .support-meta {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .support-meta div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .support-meta strong {
+      color: var(--text-muted);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .support-note {
+      margin: 0;
+      padding-top: 8px;
+      border-top: 1px solid rgba(245,158,11,0.15);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Typing */
+    .typing-row { display: none; align-items: flex-end; gap: 10px; padding: 0 18px 6px; background: #fafdfc; }
+    .typing-row.active { display: flex; animation: msg-in 0.25s ease both; }
+
+    .typing-bubble {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      padding: 13px 18px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(4,120,87,0.06);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 0.9s infinite ease-in-out both;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.15s; }
+    .dot:nth-child(3) { animation-delay: 0.30s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+      40%           { transform: scale(1); opacity: 1; }
+    }
+
+    /* Quick replies */
+    .quick-replies {
+      padding: 8px 16px 4px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      flex-shrink: 0;
+      background: #ffffff;
+    }
+
+    .quick-replies::-webkit-scrollbar { display: none; }
+
+    .qr-btn {
+      padding: 8px 14px;
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 20px;
+      background: #f0fdf8;
+      color: var(--accent-dark);
+      cursor: pointer;
+      font-size: 12.5px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .qr-btn:hover {
+      background: #dcfce7;
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(16,185,129,0.15);
+    }
+
+    .qr-btn:active { transform: translateY(0); }
+
+    /* Input bar */
+    .input-bar {
+      padding: 12px 16px 18px;
+      background: #ffffff;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .input-wrap {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: #f8fffb;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 5px 6px 5px 18px;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    .input-wrap:focus-within {
+      border-color: rgba(16,185,129,0.45);
+      box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+    }
+
+    .msg-input {
+      flex: 1;
+      padding: 9px 0;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .msg-input::placeholder { color: var(--text-muted); }
+
+    .send-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(145deg, #047857, #10b981);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 14px rgba(16,185,129,0.35);
+    }
+
+    .send-btn svg { width: 18px; height: 18px; margin-left: 2px; }
+
+    .send-btn:hover  { transform: scale(1.06); box-shadow: 0 6px 20px rgba(16,185,129,0.45); }
+    .send-btn:active { transform: scale(0.96); }
+    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* Product results */
+    .product-results {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      overflow: hidden;
+      width: 100%;
+      box-shadow: 0 2px 12px rgba(4,120,87,0.07);
+    }
+
+    .product-results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #f0fdf8, #ffffff);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .product-results-header h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .product-count {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent-dark);
+      background: #ecfdf5;
+      padding: 3px 9px;
+      border-radius: 12px;
+      border: 1px solid rgba(16,185,129,0.25);
+    }
+
+    .product-filter-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      overflow-x: auto;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .filter-btn {
+      border: 1px solid rgba(16,185,129,0.25);
+      background: #f8fffb;
+      color: var(--accent-dark);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font: inherit;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--accent);
+      background: #ecfdf5;
+    }
+
+    .active-filters {
+      padding: 8px 14px 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: #fafdfc;
+    }
+
+    .product-track {
+      display: flex;
+      gap: 12px;
+      padding: 14px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      background: #fafdfc;
+    }
+
+    .product-track::-webkit-scrollbar { display: none; }
+
+    .recommendation-section {
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+    }
+
+    .recommendation-title {
+      padding: 12px 14px 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .product-card {
+      flex: 0 0 158px;
+      scroll-snap-align: start;
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .product-card:nth-child(2) { animation-delay: 0.05s; }
+    .product-card:nth-child(3) { animation-delay: 0.10s; }
+    .product-card:nth-child(4) { animation-delay: 0.15s; }
+    .product-card:nth-child(5) { animation-delay: 0.20s; }
+    .product-card:nth-child(6) { animation-delay: 0.25s; }
+
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .product-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-hover);
+      box-shadow: 0 8px 24px rgba(4,120,87,0.12);
+    }
+
+    .product-img {
+      width: 100%;
+      height: 110px;
+      background-size: cover;
+      background-position: center;
+      background-color: var(--surface2);
+      position: relative;
+      cursor: zoom-in;
+    }
+
+    .product-img::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.45) 100%);
+    }
+
+    .product-price-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      z-index: 1;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(6px);
+      color: var(--accent-dark);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid rgba(16,185,129,0.2);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .product-image-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .product-image-modal.active {
+      display: flex;
+    }
+
+    .product-image-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 8, 23, 0.72);
+      backdrop-filter: blur(6px);
+    }
+
+    .product-image-modal-panel {
+      position: relative;
+      width: min(92vw, 480px);
+      max-height: 90vh;
+      background: #fff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+      z-index: 1;
+    }
+
+    .product-image-modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .product-image-modal-img {
+      width: 100%;
+      max-height: 70vh;
+      object-fit: cover;
+      display: block;
+      background: #f3f4f6;
+    }
+
+    .product-image-modal-title {
+      padding: 12px 14px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .product-info {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 4px;
+    }
+
+    .product-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: 34px;
+    }
+
+    .product-desc {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .product-stock {
+      font-size: 10px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stock-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .stock-available { color: var(--green); }
+    .stock-available .stock-dot { background: var(--green); }
+    .stock-out { color: var(--red); }
+    .stock-out .stock-dot { background: var(--red); }
+
+    .add-cart-btn {
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #047857, #10b981);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(16,185,129,0.25);
+    }
+
+    .add-cart-btn:hover:not(:disabled) {
+      box-shadow: 0 4px 14px rgba(16,185,129,0.35);
+    }
+
+    .add-cart-btn:active:not(:disabled) { transform: scale(0.97); }
+
+    .add-cart-btn:disabled {
+      background: #f1f5f3;
+      color: var(--text-muted);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .add-cart-btn svg { width: 13px; height: 13px; }
+
+    /* Responsive */
+    @media (max-width: 540px) {
+      body { padding: 0; }
+      .chat-wrap {
+        border-radius: 0;
+        max-height: 100vh;
+        height: 100vh;
+        box-shadow: none;
+      }
+      .feature-grid { grid-template-columns: 1fr; }
+      .product-card { flex: 0 0 148px; }
+    }
+    /* Support mode banner */
+    .support-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: linear-gradient(90deg, #1e3a5f 0%, #1d4ed8 100%);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 5;
+    }
+    .support-banner.active { display: flex; }
+    .support-banner-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse-dot 1.4s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+    .support-banner-label { flex: 1; }
+    .support-exit-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .support-exit-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* Agent message bubble */
+    .msg-row.agent .bot-icon {
+      background: linear-gradient(135deg, #1e3a5f, #1d4ed8);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .msg-row.agent .bubble {
+      background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+      color: #fff;
+      border-radius: var(--radius) var(--radius) var(--radius) 4px;
+    }
+    .agent-label {
+      font-size: 10.5px;
+      color: #1d4ed8;
+      font-weight: 700;
+      margin-bottom: 3px;
+      letter-spacing: 0.03em;
+    }
+
+  </style>
+</head>
+
+<body>
+<div class="chat-wrap" id="chatWrap">
+
+  <div class="chat-header">
+    <div class="brand-mark">G</div>
+    <div class="header-info">
+      <h1>GojoShop.et</h1>
+      <p><span class="status-dot"></span>Online - AI Shopping Assistant</p>
+    </div>
+    <div class="header-actions">
+      <button class="header-btn" title="Clear chat" id="clearBtn" aria-label="Clear chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="date-sep">Today</div>
+
+    <div class="msg-row bot" id="welcomeMsg">
+      <div class="bot-icon">S</div>
+      <div class="bot-content">
+        <div class="welcome-card">
+          <div class="welcome-hero">
+            <h2>Welcome to GojoShop.et</h2>
+            <p>Your personal shopping assistant - search products, track orders, and get help instantly.</p>
+          </div>          <div class="feature-grid">
+            <div class="feature-item"><span class="feature-icon">🔍</span><span>Search products by name or keyword</span></div>
+            <div class="feature-item"><span class="feature-icon">📦</span><span>Track orders with your Order ID</span></div>
+            <div class="feature-item"><span class="feature-icon">🚚</span><span>Shipping &amp; delivery info</span></div>
+            <div class="feature-item"><span class="feature-icon">💳</span><span>Payment methods &amp; checkout</span></div>
+          </div>
+          <div class="welcome-cta">Try a quick action below, or type what you're looking for.</div>
+        </div>
+        <div class="ts" id="welcomeTs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Support mode banner (hidden by default) -->
+  <div class="support-banner" id="supportBanner">
+    <div class="support-banner-dot"></div>
+    <span class="support-banner-label">🟢 Connected to Support Agent — type your message below</span>
+    <button class="support-exit-btn" id="exitSupportBtn">End Chat</button>
+  </div>
+
+  <div class="typing-row" id="typingRow">
+    <div class="bot-icon">R</div>
+    <div class="typing-bubble">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+  </div>
+
+  <div class="quick-replies" id="quickReplies">
+    <button class="qr-btn" data-msg="teddy bear">🧸 Teddy Bear</button>
+    <button class="qr-btn" data-msg="leather bag">👜 Leather Bag</button>
+    <button class="qr-btn" data-msg="Track my order">📦 Track Order</button>
+    <button class="qr-btn" data-msg="Shipping info">🚚 Shipping</button>
+    <button class="qr-btn" data-msg="Payment methods">💳 Payment</button>
+    <button class="qr-btn" data-msg="Talk to human">👤 Human Support</button>
+    <button class="qr-btn" data-msg="Help">🆘 Help</button>
+  </div>
+
+  <div class="input-bar">
+    <div class="input-wrap">
+      <input
+        class="msg-input"
+        id="msgInput"
+        type="text"
+        placeholder="Search products, track orders, ask anything..."
+        autocomplete="off"
+      />
+      <button class="send-btn" id="sendBtn" title="Send" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const PRODUCT_IMAGE_BASE = 'https://gojoshop.et/storage/product/thumbnail/';
+
+function nowTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function escHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* Product card renderer */
+function isProductCard(text) {
+  return text.includes('PRODUCT SEARCH');
+}
+
+function parseProductCard(text) {
+  const [resultText, recText = ''] = text.split('RECOMMENDATIONS');
+  const filtersLine = resultText.split('\n').find(line => line.trim().startsWith('Filters:'));
+
+  function parseProducts(block) {
+    const sections = block.split('\n---');
+    const parsed = [];
+    for (const sec of sections) {
+      const lines = sec.split('\n');
+      const prod = {};
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t || t.startsWith('Filters:') || t.includes('PRODUCT SEARCH')) continue;
+        if (t.startsWith('Product ID:')) { prod.id = t.replace('Product ID:', '').trim(); continue; }
+        if (t.startsWith('Name:'))       { prod.name = t.replace('Name:', '').trim(); continue; }
+        if (t.startsWith('Price:'))      { prod.price = t.replace('Price:', '').trim(); continue; }
+        if (t.startsWith('Stock:'))      { prod.stock = t.replace('Stock:', '').trim(); continue; }
+        if (t.startsWith('Image:'))      { prod.image = t.replace('Image:', '').trim(); continue; }
+        if (t.startsWith('Details:'))    { prod.details = t.replace('Details:', '').trim(); continue; }
+      }
+      if (prod.id && prod.name) parsed.push(prod);
+    }
+    return parsed;
+  }
+
+  return {
+    products: parseProducts(resultText),
+    recommendations: parseProducts(recText),
+    filters: filtersLine ? filtersLine.replace('Filters:', '').trim() : 'none',
+  };
+}
+
+function getProductImage(name) {
+  const keywords = ['toy', 'bear', 'earring', 'bag', 'backpack', 'purse', 'shoe', 'dress', 'shirt', 'towel', 'coaster', 'monkey', 'hippo'];
+  const nameLower = name.toLowerCase();
+  let foundKeyword = 'product';
+  for (const kw of keywords) {
+    if (nameLower.includes(kw)) { foundKeyword = kw; break; }
+  }
+  const images = {
+    toy:      'https://images.unsplash.com/photo-1559251606-c623743a6d76?auto=format&fit=crop&w=400&q=80',
+    bear:     'https://images.unsplash.com/photo-1582060047814-1237a2f2a75d?auto=format&fit=crop&w=400&q=80',
+    monkey:   'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=400&q=80',
+    hippo:    'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&w=400&q=80',
+    earring:  'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80',
+    bag:      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
+    backpack: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=400&q=80',
+    purse:    'https://images.unsplash.com/photo-1566150905458-1bf1fc15a7a5?auto=format&fit=crop&w=400&q=80',
+    shoe:     'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
+    dress:    'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&q=80',
+    shirt:    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
+    towel:    'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80',
+    coaster:  'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
+    product:  'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80'
+  };
+  return images[foundKeyword];
+}
+
+function resolveProductImage(thumbnail, name) {
+  if (thumbnail && thumbnail.startsWith('http')) return thumbnail;
+  if (thumbnail && thumbnail !== 'def.png') return PRODUCT_IMAGE_BASE + thumbnail;
+  return getProductImage(name);
+}
+
+const cartIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`;
+
+function ensureProductPreviewModal() {
+  let modal = document.getElementById('productImageModal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'productImageModal';
+  modal.className = 'product-image-modal';
+  modal.innerHTML = `
+    <div class="product-image-modal-backdrop" onclick="closeProductPreview()"></div>
+    <div class="product-image-modal-panel">
+      <button class="product-image-modal-close" onclick="closeProductPreview()" aria-label="Close image">×</button>
+      <img class="product-image-modal-img" alt="Product preview" />
+      <div class="product-image-modal-title"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  const panel = modal.querySelector('.product-image-modal-panel');
+  panel.addEventListener('click', e => e.stopPropagation());
+  return modal;
+}
+
+function openProductPreview(imageUrl, title) {
+  const modal = ensureProductPreviewModal();
+  const img = modal.querySelector('.product-image-modal-img');
+  const label = modal.querySelector('.product-image-modal-title');
+  img.src = imageUrl || '';
+  img.alt = title || 'Product preview';
+  label.textContent = title || 'Product preview';
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProductPreview() {
+  const modal = document.getElementById('productImageModal');
+  if (!modal) return;
+  modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeProductPreview();
+});
+
+function renderProductCards(products) {
+  return products.map(p => {
+    const isOutOfStock = parseInt(p.stock) <= 0;
+    const stockClass = isOutOfStock ? 'stock-out' : 'stock-available';
+    const stockText = isOutOfStock ? 'Out of stock' : `${p.stock} in stock`;
+    const imgUrl = resolveProductImage(p.image, p.name);
+    const safeName = escHtml(p.name);
+    const safeDetails = escHtml(p.details);
+    const safeImage = escHtml(imgUrl);
+    const safePrice = escHtml(p.price);
+    const safeStockText = escHtml(stockText);
+    const productId = Number.parseInt(p.id, 10);
+    const desc = safeDetails ? `<p class="product-desc">${safeDetails}</p>` : '';
+    const previewImage = imgUrl.replace(/'/g, "\\'");
+    const previewName = String(p.name || '').replace(/'/g, "\\'");
+    return `
+      <div class="product-card">
+        <div
+          class="product-img"
+          style="background-image:url('${safeImage}')"
+          role="button"
+          tabindex="0"
+          onclick="openProductPreview('${previewImage}', '${previewName}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openProductPreview('${previewImage}', '${previewName}');}"
+        >
+          <div class="product-price-badge">${safePrice}</div>
+        </div>
+        <div class="product-info">
+          <h3 class="product-title" title="${safeName}">${safeName}</h3>
+          ${desc}
+          <span class="product-stock ${stockClass}"><span class="stock-dot"></span>${safeStockText}</span>
+          <button class="add-cart-btn" data-product-name="${safeName}" onclick="addCartClicked(this, ${productId})" ${isOutOfStock ? 'disabled' : ''}>
+            ${isOutOfStock ? 'Sold Out' : cartIcon + ' Add'}
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function formatFilters(filters) {
+  if (!filters || filters === 'none') return 'No filters applied';
+  return filters
+    .replace(/min_price=/g, 'Min ')
+    .replace(/max_price=/g, 'Max ')
+    .replace(/in_stock=true/g, 'In stock')
+    .replace(/sort=price_asc/g, 'Cheapest first')
+    .replace(/sort=price_desc/g, 'Highest price first')
+    .replace(/sort=newest/g, 'Newest first')
+    .replace(/;/g, ' · ');
+}
+
+function renderProductGrid(data) {
+  const products = data.products || [];
+  const recommendations = data.recommendations || [];
+  const cards = renderProductCards(products);
+  const recCards = renderProductCards(recommendations);
+  const count = products.length;
+  const label = count === 1 ? '1 product' : `${count} products`;
+  const activeFilters = formatFilters(data.filters);
+  const filterButtons = [
+    ['In stock', ' in stock'], ['Cheapest', ' cheapest'], ['Newest', ' newest'], ['Under 1000', ' under 1000'],
+  ].map(([labelText, suffix]) =>
+    `<button class="filter-btn" onclick="applyProductFilter('${suffix}')">${labelText}</button>`
+  ).join('');
+  const recSection = recommendations.length
+    ? `<div class="recommendation-section"><div class="recommendation-title">Recommended alternatives</div><div class="product-track">${recCards}</div></div>`
+    : '';
+  return `
+    <div class="product-results">
+      <div class="product-results-header">
+        <h3>Search Results</h3>
+        <span class="product-count">${label}</span>
+      </div>
+      <div class="product-filter-bar">${filterButtons}</div>
+      <div class="active-filters">${escHtml(activeFilters)}</div>
+      <div class="product-track">${cards}</div>
+      ${recSection}
+    </div>`;
+}
+
+function isSupportCard(text) {
+  return text.includes('━━━ HUMAN SUPPORT ━━━');
+}
+
+function parseSupportCard(text) {
+  const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('━━━'));
+  const data = { intro: '' };
+  const marker = '━━━ HUMAN SUPPORT ━━━';
+  const parts = text.split(marker);
+  if (parts[0]) data.intro = parts[0].trim();
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith('Shop:'))  data.shop  = t.replace('Shop:', '').trim();
+    if (t.startsWith('Email:')) data.email = t.replace('Email:', '').trim();
+    if (t.startsWith('Phone:')) data.phone = t.replace('Phone:', '').trim();
+    if (t.startsWith('Hours:')) data.hours = t.replace('Hours:', '').trim();
+    if (t.startsWith('Note:'))  data.note  = t.replace('Note:', '').trim();
+  }
+  return data;
+}
+
+function renderSupportCard(data) {
+  const intro = data.intro
+    ? `<p class="support-intro">${data.intro.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</p>`
+    : '';
+  const email = data.email || 'support@gojoshop.et';
+  const phone = (data.phone || '+251911234567').replace(/\s/g, '');
+  return `
+    <div class="support-card">
+      ${intro}
+      <div class="support-card-header">
+        <span class="support-badge">💬 Human Support</span>
+        <span class="support-shop">${data.shop || 'GojoShop.et'}</span>
+      </div>
+      <div class="support-actions">
+        <a class="support-btn email" href="mailto:${email}">📧 Email us</a>
+        <a class="support-btn phone" href="tel:${phone}">📞 Call us</a>
+      </div>
+      <div class="support-meta">
+        <div><strong>Email</strong><span>${email}</span></div>
+        <div><strong>Phone</strong><span>${data.phone || phone}</span></div>
+        <div><strong>Hours</strong><span>${data.hours || 'Mon–Sat, 9–6 EAT'}</span></div>
+      </div>
+      ${data.note ? `<p class="support-note">${data.note}</p>` : ''}
+    </div>`;
+}
+
+function isOrderCard(text) {
+  return text.startsWith('━━━') && !text.includes('PRODUCT SEARCH') && !isSupportCard(text);
+}
+
+const STATUS_CLASS = {
+  DELIVERED: 'status-delivered', SHIPPED: 'status-shipped',
+  PROCESSING: 'status-processing', PENDING: 'status-pending', CANCELLED: 'status-cancelled',
+};
+const STATUS_EMOJI = {
+  DELIVERED:'✅', SHIPPED:'🚚', PROCESSING:'⚙️', PENDING:'🕒', CANCELLED:'✖️'
+};
+
+function parseOrderCard(text) {
+  const lines = text.split('\n').filter(l => !l.startsWith('━━━'));
+  const data = {}; const items = []; let inItems = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    if (t.startsWith('🧾 Order:'))      { data.order_id = t.replace('🧾 Order:', '').trim(); continue; }
+    if (t.startsWith('👤'))            { data.customer  = t.replace('👤', '').trim(); continue; }
+    if (t.startsWith('🗓️ Placed:'))    { data.placed    = t.replace('🗓️ Placed:', '').trim(); continue; }
+    if (t.startsWith('Status:'))       { data.status    = t.replace(/Status:.*?(\w+)$/, '$1').trim().toUpperCase(); continue; }
+    if (t.startsWith('Tracking:'))     { data.tracking  = t.replace('Tracking:', '').trim(); continue; }
+    if (t.startsWith('Delivery to:'))  { data.address   = t.replace('Delivery to:', '').trim(); continue; }
+    if (t.startsWith('🛍️ Items:'))     { inItems = true; continue; }
+    if (t.startsWith('💳 Payment:'))   { inItems = false; data.payment = t.replace('💳 Payment:', '').trim(); continue; }
+    if (t.startsWith('💰 Total:'))     { data.total = t.replace('💰 Total:', '').trim(); continue; }
+    if (inItems && t.startsWith('•')) {
+      const m = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+)/);
+      if (m) items.push({ name: m[1], qty: m[2], price: m[3] }); continue;
+    }
+    if (!t.startsWith('•') && !inItems && data.total) data.statusMsg = t;
+  }
+  data.items = items;
+  return data;
+}
+
+function renderOrderCard(data) {
+  const sc = STATUS_CLASS[data.status] || 'status-pending';
+  const se = STATUS_EMOJI[data.status] || '📦';
+  const itemRows = data.items.map(it => `<li><span>${it.name} × ${it.qty}</span><span>${it.price}</span></li>`).join('');
+  return `
+    <div class="order-card">
+      <div class="oc-row"><span class="oc-label">Order ID</span><span class="oc-val">${data.order_id || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">Customer</span><span class="oc-val">${data.customer || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">Placed</span><span class="oc-val">${data.placed || '—'}</span></div>
+      <hr class="oc-divider"/>
+      <div class="oc-row"><span class="oc-label">Status</span><span class="status-badge ${sc}">${se} ${data.status || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">Tracking</span><span class="oc-val">${data.tracking || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">Delivery</span><span class="oc-val">${data.address || '—'}</span></div>
+      <hr class="oc-divider"/>
+      <ul class="oc-items-list">${itemRows}</ul>
+      <hr class="oc-divider"/>
+      <div class="oc-row"><span class="oc-label">Payment</span><span class="oc-val">${data.payment || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">Total</span><span class="oc-val oc-total">${data.total || '—'}</span></div>
+      ${data.statusMsg ? `<hr class="oc-divider"/><div style="font-size:12.5px;color:var(--text-muted)">${data.statusMsg}</div>` : ''}
+    </div>`;
+}
+
+/* ==================================================================
+   Live Support Polling
+================================================================== */
+const SupportPoller = {
+  _interval: null,
+  _lastCount: 0,
+  _requestId: null,
+
+  start(userId, chat) {
+    this._lastCount = 0;
+    this._requestId = null;
+    this._interval = setInterval(() => this._poll(userId, chat), 3000);
+    this._poll(userId, chat);
+  },
+
+  stop() {
+    if (this._interval) { clearInterval(this._interval); this._interval = null; }
+    this._lastCount = 0;
+    this._requestId = null;
+  },
+
+  async _poll(userId, chat) {
+    try {
+      const res = await fetch(`/api/support/requests/active/${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data.status !== 'active') {
+        // Support session ended by agent
+        this.stop();
+        chat._setSupportMode(false);
+        chat._appendBotWithDelay('✅ Support session has ended. How else can I help you?', 0, false);
+        return;
+      }
+      this._requestId = data.request_id;
+      const messages = data.messages || [];
+      // Only show new messages since last poll
+      const newMsgs = messages.slice(this._lastCount);
+      this._lastCount = messages.length;
+      for (const msg of newMsgs) {
+        if (msg.sender === 'agent') {
+          chat._appendAgentMessage(msg.text);
+        }
+      }
+    } catch (e) {
+      console.warn('Support poll error:', e);
+    }
+  }
+};
+
+/* ==================================================================
+   GojoChat class
+================================================================== */
+class GojoChat {
+  constructor() {
+    this.userId   = localStorage.getItem('gojo_uid') || this._genId();
+    localStorage.setItem('gojo_uid', this.userId);
+    this.input    = $('msgInput');
+    this.sendBtn  = $('sendBtn');
+    this.messages = $('chatMessages');
+    this.typing   = $('typingRow');
+    this.lastProductQuery = localStorage.getItem('gojo_last_product_query') || '';
+    this._inSupportMode = false;
+    $('welcomeTs').textContent = nowTime();
+    this._bind();
+    this._restoreAiState();
+  }
+
+  _genId() { return 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
+
+  _bind() {
+    this.sendBtn.addEventListener('click', () => this.send());
+    this.input.addEventListener('keydown', e => { if (e.key === 'Enter') this.send(); });
+    document.querySelectorAll('.qr-btn').forEach(btn =>
+      btn.addEventListener('click', () => { this.input.value = btn.dataset.msg; this.send(); })
+    );
+    $('clearBtn').addEventListener('click', async () => {
+      await this._resetConversation();
+    });
+    $('exitSupportBtn').addEventListener('click', async () => {
+      // Send exit command through chat
+      this.input.value = 'exit';
+      await this.send();
+    });
+  }
+
+  async _restoreAiState() {
+    this._setSupportMode(false);
+    try {
+      const res = await fetch(`/api/support/requests/active/${encodeURIComponent(this.userId)}`);
+      const data = await res.json();
+      if (data.status === 'active') {
+        await fetch('/api/session/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: this.userId })
+        });
+      }
+    } catch (_) {}
+    this._setSupportMode(false);
+  }
+
+  async _resetConversation() {
+    this.messages.innerHTML = '<div class="date-sep">Today</div>';
+    this._setSupportMode(false);
+    try {
+      await fetch('/api/session/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: this.userId })
+      });
+    } catch (_) {}
+    this._setSupportMode(false);
+    await this._appendBotWithDelay('Chat cleared! How can I help you today? 😊', 600, false);
+  }
+
+  _setSupportMode(on) {
+    this._inSupportMode = on;
+    const banner = $('supportBanner');
+    const quickReplies = $('quickReplies');
+    const input = this.input;
+    if (on) {
+      banner.classList.add('active');
+      quickReplies.style.display = 'none';
+      input.placeholder = 'Type a message to the support agent...';
+    } else {
+      banner.classList.remove('active');
+      SupportPoller.stop();
+      quickReplies.style.display = '';
+      input.placeholder = 'Search products, track orders, ask anything...';
+    }
+  }
+
+  async send() {
+    const msg = this.input.value.trim();
+    if (!msg) return;
+    this._appendUser(msg);
+    this.input.value = '';
+    this.input.focus();
+    this._setTyping(true);
+    this.sendBtn.disabled = true;
+    const started = Date.now();
+    try {
+      const res  = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: this.userId, message: msg })
+      });
+      const data = await res.json();
+
+      // Handle support mode
+      if (data.in_support_mode) {
+        this._setTyping(false);
+        if (!this._inSupportMode) {
+          this._setSupportMode(true);
+          SupportPoller.start(this.userId, this);
+          // Initial poll fills messages from the initial request
+        }
+        this.sendBtn.disabled = false;
+        return;
+      }
+
+      if (data.intent === 'product_search') {
+        this.lastProductQuery = msg;
+        localStorage.setItem('gojo_last_product_query', msg);
+      }
+
+      // Exited support mode via 'exit' command
+      if (this._inSupportMode && data.intent !== 'human_support') {
+        this._setSupportMode(false);
+      }
+
+      const delay = data.typing_delay_ms || this._estimateDelay(data.response);
+      const elapsed = Date.now() - started;
+      const wait = Math.max(0, delay - elapsed);
+      await this._sleep(wait);
+      this._setTyping(false);
+      await this._appendBotWithDelay(data.response, 0, true);
+    } catch (err) {
+      this._setTyping(false);
+      await this._appendBotWithDelay('⚠️ Connection error. Please try again.', 500, false);
+    } finally {
+      this.sendBtn.disabled = false;
+    }
+  }
+
+  _estimateDelay(text) {
+    if (!text) return 800;
+    if (text.includes('━━━')) return 1100;
+    return Math.min(3200, 800 + text.split(/\s+/).length * 40);
+  }
+
+  _sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  _appendUser(text) {
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `
+      <div class="bot-content">
+        <div class="bubble">${this._esc(text)}</div>
+        <div class="ts">${nowTime()}</div>
+      </div>`;
+    this.messages.appendChild(row);
+    this._scroll();
+  }
+
+  _appendAgentMessage(text) {
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.innerHTML = `
+      <div class="bot-icon">👤</div>
+      <div class="bot-content">
+        <div class="agent-label">Support Agent</div>
+        <div class="bubble">${this._esc(text)}</div>
+        <div class="ts">${nowTime()}</div>
+      </div>`;
+    this.messages.appendChild(row);
+    this._scroll();
+  }
+
+  _appendBot(text) { return this._appendBotWithDelay(text, 0, false); }
+
+  async _appendBotWithDelay(text, preDelay = 0, typewriter = false) {
+    if (preDelay > 0) await this._sleep(preDelay);
+    const row = document.createElement('div');
+    const isProducts = isProductCard(text);
+    const isSupport = isSupportCard(text);
+    row.className = 'msg-row bot' + (isProducts ? ' wide' : '');
+    const useTypewriter = typewriter && !isProducts && !isOrderCard(text) && !isSupport;
+    let inner = '';
+    if (isSupport) {
+      inner = renderSupportCard(parseSupportCard(text));
+      // When support card is shown, activate live support mode
+      setTimeout(() => {
+        this._setSupportMode(true);
+        SupportPoller.start(this.userId, this);
+      }, 600);
+    } else if (isOrderCard(text)) {
+      inner = renderOrderCard(parseOrderCard(text));
+    } else if (isProducts) {
+      inner = renderProductGrid(parseProductCard(text));
+    } else {
+      inner = `<div class="bubble">${useTypewriter ? '' : this._fmt(text)}</div>`;
+    }
+    row.innerHTML = `
+      <div class="bot-icon">✦</div>
+      <div class="bot-content">
+        ${inner}
+        <div class="ts">${nowTime()}</div>
+      </div>`;
+    this.messages.appendChild(row);
+    this._scroll();
+    if (useTypewriter) {
+      const bubble = row.querySelector('.bubble');
+      await this._typewriter(bubble, text);
+    }
+  }
+
+  async _typewriter(el, text) {
+    let i = 0;
+    const step = text.length > 280 ? 3 : text.length > 120 ? 2 : 1;
+    const pause = text.length > 280 ? 12 : text.length > 120 ? 18 : 28;
+    while (i < text.length) {
+      el.innerHTML = this._fmt(text.slice(0, i + step));
+      i += step; this._scroll();
+      await this._sleep(pause);
+    }
+    el.innerHTML = this._fmt(text); this._scroll();
+  }
+
+  appendLocalBotMessage(text) { this._appendBot(text); }
+
+  _setTyping(on) { this.typing.classList.toggle('active', on); this._scroll(); }
+
+  _scroll() {
+    requestAnimationFrame(() => { this.messages.scrollTop = this.messages.scrollHeight; });
+  }
+
+  _esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  _fmt(text) {
+    return this._esc(text)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+}
+
+window.gojoChatInstance = new GojoChat();
+
+window.applyProductFilter = (suffix) => {
+  const chat = window.gojoChatInstance;
+  chat.input.value = `${chat.lastProductQuery || 'products'}${suffix}`;
+  chat.send();
+};
+
+window.addCartClicked = async (btn, id) => {
+  const name = btn.dataset.productName || 'this item';
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = 'Adding…';
+  try {
+    const res = await fetch('/api/cart/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: window.gojoChatInstance.userId, product: name })
+    });
+    if (res.ok) {
+      btn.innerHTML = '✓ Added';
+      btn.style.background = 'var(--green)';
+      setTimeout(() => {
+        window.gojoChatInstance.appendLocalBotMessage(`🛒 Added **${name}** to your cart! Type \`checkout\` when you're ready.`);
+      }, 300);
+    } else { throw new Error('Failed'); }
+  } catch (err) {
+    console.error(err);
+    btn.innerHTML = 'Failed'; btn.style.background = 'var(--red)';
+    setTimeout(() => { btn.innerHTML = originalHtml; btn.style.background = ''; btn.disabled = false; }, 1500);
+  }
+};
+</script>
+</body>
+</html>
