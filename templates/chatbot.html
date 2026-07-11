@@ -386,6 +386,12 @@
       padding: 4px 0;
       color: var(--text-soft);
     }
+    .oc-items-list li .long-name {
+      max-width: 200px;
+      word-break: break-word;
+      line-height: 1.3;
+      margin-right: 8px;
+    }
     .oc-total { font-size: 15px; font-weight: 700; color: var(--accent-dark); }
 
     .ts {
@@ -1365,20 +1371,48 @@ function parseOrderCard(text) {
   for (const line of lines) {
     const t = line.trim();
     if (!t) continue;
+    // Handle new format with 📦 Order #100001
+    if (t.startsWith('📦 Order #'))      { data.order_id = t.replace('📦 Order #', '').trim(); continue; }
+    // Handle old format with 🧾 Order:
     if (t.startsWith('🧾 Order:'))      { data.order_id = t.replace('🧾 Order:', '').trim(); continue; }
     if (t.startsWith('👤'))            { data.customer  = t.replace('👤', '').trim(); continue; }
-    if (t.startsWith('🗓️ Placed:'))    { data.placed    = t.replace('🗓️ Placed:', '').trim(); continue; }
-    if (t.startsWith('Status:'))       { data.status    = t.replace(/Status:.*?(\w+)$/, '$1').trim().toUpperCase(); continue; }
+    if (t.startsWith('📱'))            { data.phone     = t.replace('📱', '').trim(); continue; }
+    if (t.startsWith('📧'))            { data.email     = t.replace('📧', '').trim(); continue; }
+    if (t.startsWith('📅 Placed:'))    { data.placed    = t.replace('📅 Placed:', '').trim(); continue; }
+    if (t.startsWith('🔄 Updated:'))    { data.updated   = t.replace('🔄 Updated:', '').trim(); continue; }
+    if (t.startsWith('Status:'))       { 
+      const statusMatch = t.match(/Status:.*?([A-Z]+)$/);
+      data.status    = statusMatch ? statusMatch[1].trim().toUpperCase() : t.replace('Status:', '').trim().toUpperCase(); 
+      continue; 
+    }
     if (t.startsWith('Tracking:'))     { data.tracking  = t.replace('Tracking:', '').trim(); continue; }
+    if (t.startsWith('Expected:'))     { data.expected  = t.replace('Expected:', '').trim(); continue; }
     if (t.startsWith('Delivery to:'))  { data.address   = t.replace('Delivery to:', '').trim(); continue; }
+    if (t.startsWith('📝 Note:'))     { data.note     = t.replace('📝 Note:', '').trim(); continue; }
     if (t.startsWith('🛍️ Items:'))     { inItems = true; continue; }
     if (t.startsWith('💳 Payment:'))   { inItems = false; data.payment = t.replace('💳 Payment:', '').trim(); continue; }
+    if (t.startsWith('🔢 Transaction:')) { data.transaction = t.replace('🔢 Transaction:', '').trim(); continue; }
     if (t.startsWith('💰 Total:'))     { data.total = t.replace('💰 Total:', '').trim(); continue; }
+    if (t.startsWith('🏢 Seller:'))    { data.seller    = t.replace('🏢 Seller:', '').trim(); continue; }
     if (inItems && t.startsWith('•')) {
-      const m = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+)/);
-      if (m) items.push({ name: m[1], qty: m[2], price: m[3] }); continue;
+      const m = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+?)\s+([✅|🚚|⚙️|🕐|❌])/);
+      if (m) {
+        items.push({ 
+          name: m[1].trim(), 
+          qty: m[2], 
+          price: m[3].trim() + ' ' + (m[4] || '')
+        }); 
+      } else {
+        // Fallback for items without emoji
+        const m2 = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+)/);
+        if (m2) items.push({ name: m2[1].trim(), qty: m2[2], price: m2[3].trim() });
+      }
+      continue;
     }
-    if (!t.startsWith('•') && !inItems && data.total) data.statusMsg = t;
+    // Capture status messages after total
+    if (!t.startsWith('•') && !inItems && data.total && !data.statusMsg) {
+      data.statusMsg = t;
+    }
   }
   data.items = items;
   return data;
@@ -1387,23 +1421,103 @@ function parseOrderCard(text) {
 function renderOrderCard(data) {
   const sc = STATUS_CLASS[data.status] || 'status-pending';
   const se = STATUS_EMOJI[data.status] || '📦';
-  const itemRows = data.items.map(it => `<li><span>${it.name} × ${it.qty}</span><span>${it.price}</span></li>`).join('');
-  return `
-    <div class="order-card">
-      <div class="oc-row"><span class="oc-label">Order ID</span><span class="oc-val">${data.order_id || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Customer</span><span class="oc-val">${data.customer || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Placed</span><span class="oc-val">${data.placed || '—'}</span></div>
-      <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">Status</span><span class="status-badge ${sc}">${se} ${data.status || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Tracking</span><span class="oc-val">${data.tracking || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Delivery</span><span class="oc-val">${data.address || '—'}</span></div>
-      <hr class="oc-divider"/>
-      <ul class="oc-items-list">${itemRows}</ul>
-      <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">Payment</span><span class="oc-val">${data.payment || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Total</span><span class="oc-val oc-total">${data.total || '—'}</span></div>
-      ${data.statusMsg ? `<hr class="oc-divider"/><div style="font-size:12.5px;color:var(--text-muted)">${data.statusMsg}</div>` : ''}
-    </div>`;
+  // Format items with qty × variant, name (with wrapping for long names)
+  const itemRows = data.items.map(it => {
+    const name = it.name || 'Unknown Item';
+    const qty = it.qty || '1';
+    const variant = it.variant || it.variation || '';
+    const price = it.price || '0.00 ETB';
+    
+    // Create formatted item text
+    let itemText = `${qty} × ${name}`;
+    if (variant) {
+      itemText = `${qty} × ${variant}, ${name}`;
+    }
+    
+    // Handle long names by adding CSS class for wrapping
+    const nameClass = name.length > 35 ? 'long-name' : '';
+    
+    return `<li><span class="${nameClass}">${itemText}</span><span>${price}</span></li>`;
+  }).join('');
+  
+  // Build the complete order card with all enhanced fields
+  let cardHtml = `<div class="order-card">`;
+  
+  // Order header section
+  cardHtml += `<div class="oc-row"><span class="oc-label">Order ID</span><span class="oc-val">${data.order_id || '—'}</span></div>`;
+  
+  // Customer info section
+  if (data.customer) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Customer</span><span class="oc-val">${data.customer}</span></div>`;
+  }
+  if (data.phone) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Phone</span><span class="oc-val">${data.phone}</span></div>`;
+  }
+  if (data.email) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Email</span><span class="oc-val">${data.email}</span></div>`;
+  }
+  
+  // Timeline section
+  if (data.placed) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Placed</span><span class="oc-val">${data.placed}</span></div>`;
+  }
+  if (data.updated) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Updated</span><span class="oc-val">${data.updated}</span></div>`;
+  }
+  
+  // Status section
+  if (data.status) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Status</span><span class="status-badge ${sc}">${se} ${data.status}</span></div>`;
+  }
+  
+  // Delivery section
+  if (data.tracking) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Tracking</span><span class="oc-val">${data.tracking}</span></div>`;
+  }
+  if (data.expected && data.expected !== 'N/A') {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Expected</span><span class="oc-val">${data.expected}</span></div>`;
+  }
+  if (data.address) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Delivery</span><span class="oc-val">${data.address}</span></div>`;
+  }
+  if (data.note && data.note !== 'N/A') {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Note</span><span class="oc-val">${data.note}</span></div>`;
+  }
+  
+  // Items section
+  if (data.items && data.items.length > 0) {
+    cardHtml += `<hr class="oc-divider"/>`;
+    cardHtml += `<div class="oc-row"><span class="oc-label">Items</span></div>`;
+    cardHtml += `<ul class="oc-items-list">${itemRows}</ul>`;
+  }
+  
+  // Payment section
+  if (data.payment) {
+    cardHtml += `<hr class="oc-divider"/>`;
+    cardHtml += `<div class="oc-row"><span class="oc-label">Payment</span><span class="oc-val">${data.payment}</span></div>`;
+  }
+  if (data.transaction && data.transaction !== 'N/A') {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Transaction</span><span class="oc-val">${data.transaction}</span></div>`;
+  }
+  
+  // Total section
+  if (data.total) {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Total</span><span class="oc-val oc-total">${data.total}</span></div>`;
+  }
+  
+  // Seller section
+  if (data.seller && data.seller !== 'N/A') {
+    cardHtml += `<div class="oc-row"><span class="oc-label">Seller</span><span class="oc-val">${data.seller}</span></div>`;
+  }
+  
+  // Status message
+  if (data.statusMsg && data.statusMsg.trim()) {
+    cardHtml += `<hr class="oc-divider"/>`;
+    cardHtml += `<div style="font-size:12.5px;color:var(--text-muted)">${data.statusMsg}</div>`;
+  }
+  
+  cardHtml += `</div>`;
+  return cardHtml;
 }
 
 /* ==================================================================

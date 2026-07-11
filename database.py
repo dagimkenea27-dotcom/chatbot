@@ -24,7 +24,7 @@ class DatabaseManager:
             "port":     int(os.getenv("DB_PORT", 3306)),
             "user":     os.getenv("DB_USER", "root"),
             "password": os.getenv("DB_PASSWORD", ""),
-            "db":       os.getenv("DB_NAME", "gojoshop"),
+            "db":       os.getenv("DB_NAME", "gojoshopchat"),
             "charset":  "utf8mb4",
             "cursorclass": pymysql.cursors.DictCursor,
             "connect_timeout": 5,
@@ -49,13 +49,13 @@ class DatabaseManager:
         Fetch a single order by order_id (e.g. 'ORD-1001').
         Returns a dict with order fields, or None if not found / DB down.
         """
-        # Normalise: accept '1001', '#1001', 'ORD-1001' → 'ORD-1001'
+        # Normalise: accept '1001', '#1001', '' → 'ORD-1001'
         order_id = self._normalise_order_id(order_id)
         try:
             conn = self._get_connection()
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM orders WHERE order_id = %s LIMIT 1",
+                    "SELECT * FROM orders WHERE id = %s LIMIT 1",
                     (order_id,)
                 )
                 row = cur.fetchone()
@@ -75,8 +75,8 @@ class DatabaseManager:
             conn = self._get_connection()
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT product_name, quantity, unit_price "
-                    "FROM order_items WHERE order_id = %s",
+                    "SELECT JSON_UNQUOTE(JSON_EXTRACT(product_details, '$.name')) AS product_name, qty AS quantity, price AS unit_price "
+                    "FROM order_details WHERE order_id = %s",
                     (order_id,)
                 )
                 rows = cur.fetchall()
@@ -206,18 +206,26 @@ class DatabaseManager:
             return None
 
     @staticmethod
-    def _normalise_order_id(raw: str) -> str:
+    def _normalise_order_id(raw) -> str:
         """
         Convert user input to canonical order ID format.
-        '1001'     → 'ORD-1001'
-        '#1001'    → 'ORD-1001'
-        'ORD-1001' → 'ORD-1001'
-        'ord-1001' → 'ORD-1001'
+        For numeric IDs (current schema): '100001' → '100001'
+        For string IDs (legacy): 'ORD-1001' → 'ORD-1001'
+        Handles both string and integer inputs.
         """
+        # Convert to string if it's not already
+        if not isinstance(raw, str):
+            raw = str(raw)
         raw = raw.strip().upper().lstrip("#")
-        if not raw.startswith("ORD-"):
-            raw = f"ORD-{raw}"
-        return raw
+        # Try to convert to integer - if successful, return as string
+        try:
+            int(raw)
+            return raw
+        except ValueError:
+            # If it's not numeric, keep the original logic for string-based IDs
+            if not raw.startswith("ORD-"):
+                raw = f"ORD-{raw}"
+            return raw
 
 
 # Singleton used across the app

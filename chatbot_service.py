@@ -845,9 +845,9 @@ What would you like to know?"""
             )
 
         # Store in session for follow-ups
-        session["last_order_id"] = order["order_id"]
+        session["last_order_id"] = order["id"]
 
-        items = self.db.get_order_items(order["order_id"])
+        items = self.db.get_order_items(order["id"])
         return self._format_order_card(order, items)
 
     def handle_order_followup(self, message: str, session: Dict) -> str:
@@ -896,50 +896,87 @@ What would you like to know?"""
 
     def _format_order_card(self, order: dict, items: list) -> str:
         """Format order info as a rich text card for the chat bubble."""
-        status      = order.get("status", "unknown")
+        status      = order.get("order_status", order.get("status", "unknown"))
         emoji       = self._status_emoji(status)
-        total       = order.get("total_amount", 0)
+        total       = order.get("order_amount", order.get("total_amount", 0))
         tracking    = order.get("tracking_number") or "Not yet assigned"
-        address     = order.get("delivery_address", "N/A")
+        address     = order.get("shipping_address", order.get("delivery_address", "N/A"))
         customer    = order.get("customer_name", "Customer")
+        phone       = order.get("customer_phone", "N/A")
+        email       = order.get("customer_email", "N/A")
         payment     = order.get("payment_method", "N/A")
         pay_status  = order.get("payment_status", "N/A")
         created     = order.get("created_at")
-        created_str = created.strftime("%b %d, %Y") if created else "N/A"
-
+        updated     = order.get("updated_at")
+        created_str = created.strftime("%b %d, %Y %I:%M %p") if created else "N/A"
+        updated_str = updated.strftime("%b %d, %Y %I:%M %p") if updated else "N/A"
+        order_note  = order.get("order_note", "N/A")
+        expected_delivery = order.get("expected_delivery_date")
+        expected_str = expected_delivery.strftime("%b %d, %Y") if expected_delivery else "N/A"
+        transaction_ref = order.get("transaction_ref", "N/A")
+        seller_info = order.get("seller_is", "N/A")
+        
+        # Cancellation info
+        cancel_reason = order.get("cancel_reason", "N/A")
+        cancel_cause = order.get("cancel_cause", "N/A")
+        
         item_lines = ""
         for it in items:
             subtotal = float(it["unit_price"]) * int(it["quantity"])
-            item_lines += f"\n  • {it['product_name']} × {it['quantity']}  —  {subtotal:,.2f} ETB"
+            # Get delivery status for this item if available
+            item_delivery_status = it.get("delivery_status", "pending")
+            item_emoji = self._status_emoji(item_delivery_status)
+            # Include product ID and variant if available
+            product_id = it.get("product_id", "N/A")
+            variant = it.get("variant", "N/A")
+            item_lines += f"\n  • {it['product_name']} × {it['quantity']}  —  {subtotal:,.2f} ETB {item_emoji}"
+            if product_id != "N/A":
+                item_lines += f" (ID: {product_id})"
+            if variant != "N/A":
+                item_lines += f" [Variant: {variant}]"
 
         card = (
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📦 Order: {order['order_id']}\n"
+            f"📦 Order #{order['id']}\n"
             f"👤 {customer}\n"
+            f"📱 {phone}\n"
+            f"📧 {email}\n"
             f"📅 Placed: {created_str}\n"
+            f"🔄 Updated: {updated_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Status: {emoji} {status.upper()}\n"
             f"Tracking: {tracking}\n"
+            f"Expected: {expected_str}\n"
             f"Delivery to: {address}\n"
+            f"📝 Note: {order_note}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🛍️ Items:{item_lines}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"💳 Payment: {payment}  [{pay_status}]\n"
+            f"🔢 Transaction: {transaction_ref}\n"
             f"💰 Total: {float(total):,.2f} ETB\n"
+            f"🏢 Seller: {seller_info}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
         )
 
+        # Add cancellation info if applicable
+        if status == "canceled":
+            card += f"❌ Cancellation Reason: {cancel_reason}\n"
+            if cancel_cause != "N/A":
+                card += f"🔍 Cancel Cause ID: {cancel_cause}\n"
+            card += "Refunds are processed within 5 business days."
+
         # Add status-specific message
         if status == "delivered":
-            card += "Your order has been delivered! Enjoying your purchase? 😊"
+            card += "✅ Your order has been delivered! Enjoying your purchase? 😊"
         elif status == "shipped":
-            card += "Your order is on its way! Expected delivery in 1-2 days."
+            card += "🚚 Your order is on its way! Expected delivery in 1-2 days."
         elif status == "processing":
-            card += "We're preparing your order. It will ship soon!"
+            card += "⚙️ We're preparing your order. It will ship soon!"
         elif status == "pending":
-            card += "Your order is confirmed and awaiting processing."
+            card += "🕐 Your order is confirmed and awaiting processing."
         elif status == "cancelled":
-            card += "This order was cancelled. Refunds are processed within 5 business days."
+            card += "❌ This order was cancelled. Refunds are processed within 5 business days."
 
         return card
 
