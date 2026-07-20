@@ -87,6 +87,10 @@ class GojoShopChatbot:
         if active_req:
             self.update_support_request_status(active_req["id"], "resolved")
 
+        # Clear cart from DB
+        if self.db is not None and hasattr(self.db, "clear_cart"):
+            self.db.clear_cart(user_id)
+
         self.user_sessions.pop(user_id, None)
         self._ensure_session(user_id)
 
@@ -186,6 +190,8 @@ class GojoShopChatbot:
         """Main entry point for getting chatbot response"""
         self._ensure_session(user_id)
         session = self.user_sessions[user_id]
+        if self.db is not None and hasattr(self.db, "get_cart_items_by_user"):
+            session["cart"] = self.db.get_cart_items_by_user(user_id)
         session["message_count"] = session.get("message_count", 0) + 1
         self._record_turn(session, "user", message)
 
@@ -710,6 +716,29 @@ All payments are secure and encrypted. Need help with a specific payment method?
 For warranty claims, visit our store or contact support with your receipt."""
 
     def handle_checkout(self, message: str, session: Dict) -> str:
+        user_id = session.get("user_id", "default")
+        # Sync cart from database
+        self.get_cart(user_id)
+        
+        if self.db is not None and hasattr(self.db, "get_cart_details"):
+            details = self.db.get_cart_details(user_id)
+            items = details.get("items", [])
+            total_price = details.get("total_price", 0.0)
+            
+            if not items:
+                return "Your cart is empty. Would you like to browse our products?"
+                
+            item_lines = ""
+            for item in items:
+                item_lines += f"\n• {item['name']} × {item['quantity']}  —  {item['subtotal']:,.2f} ETB"
+                
+            return (
+                f"🛒 **Your Cart Summary:**\n"
+                f"{item_lines}\n\n"
+                f"💰 **Total Amount: {total_price:,.2f} ETB**\n\n"
+                f"Would you like to proceed to checkout? I can help you with payment and delivery details."
+            )
+            
         cart_items = session.get("cart", [])
         if not cart_items:
             return "Your cart is empty. Would you like to browse our products?"
@@ -987,10 +1016,22 @@ What would you like to know?"""
     def add_to_cart(self, user_id: str, product: str) -> str:
         """Add product to user's cart (auto-creates session if needed)."""
         self._ensure_session(user_id)
+        if self.db is not None and hasattr(self.db, "add_item_to_cart"):
+            success = self.db.add_item_to_cart(user_id, product)
+            if success:
+                # Sync session in-memory state
+                if hasattr(self.db, "get_cart_items_by_user"):
+                    self.user_sessions[user_id]["cart"] = self.db.get_cart_items_by_user(user_id)
+                return f"Added {product} to your cart! 🛒"
+        
         self.user_sessions[user_id]["cart"].append(product)
         return f"Added {product} to your cart! 🛒"
 
     def get_cart(self, user_id: str) -> List[str]:
         """Get user's cart items (auto-creates session if needed)."""
         self._ensure_session(user_id)
+        if self.db is not None and hasattr(self.db, "get_cart_items_by_user"):
+            cart_items = self.db.get_cart_items_by_user(user_id)
+            self.user_sessions[user_id]["cart"] = cart_items
+            return cart_items
         return self.user_sessions[user_id]["cart"]

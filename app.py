@@ -195,7 +195,36 @@ def add_to_cart():
         return jsonify({'error': 'User ID and product required'}), 400
 
     response = chatbot.add_to_cart(user_id, product)
-    return jsonify({'message': response})
+    # Return updated cart count from DB if available
+    cart_count = len(chatbot.get_cart(user_id))
+    return jsonify({'message': response, 'cart_count': cart_count})
+
+
+@app.route('/api/cart/details/<user_id>', methods=['GET'])
+def get_cart_details(user_id):
+    """Get cart with full pricing details and grand total"""
+    if hasattr(db, 'get_cart_details'):
+        details = db.get_cart_details(user_id)
+        return jsonify(details)
+    # Fallback: plain list
+    cart = chatbot.get_cart(user_id)
+    return jsonify({'items': [{'name': p} for p in cart], 'total_price': 0.0})
+
+
+@app.route('/api/cart/clear', methods=['POST'])
+def clear_cart():
+    """Clear all items from a user's cart"""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
+    if hasattr(db, 'clear_cart'):
+        db.clear_cart(user_id)
+        # Sync session cart too
+        chatbot._ensure_session(user_id)
+        chatbot.user_sessions[user_id]['cart'] = []
+    return jsonify({'message': 'Cart cleared', 'user_id': user_id})
 
 
 @app.route('/api/products', methods=['GET'])

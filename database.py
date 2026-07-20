@@ -205,6 +205,232 @@ class DatabaseManager:
             logger.error(f"get_product_by_id error: {e}")
             return None
 
+    def get_or_create_user(self, user_id: str) -> dict | None:
+        """
+        Look up user by ID (for numeric ID), telegram_id (for Telegram bot user_id),
+        or email (for web guest users). Create if it doesn't exist.
+        """
+        import random
+        import string
+        
+        if not user_id:
+            return None
+            
+        try:
+            conn = self._get_connection()
+            user = None
+            with conn.cursor() as cur:
+                # 1. Try numeric user_id as either PK or telegram_id
+                try:
+                    num_id = int(user_id)
+                    cur.execute("SELECT * FROM users WHERE telegram_id = %s LIMIT 1", (num_id,))
+                    user = cur.fetchone()
+                    if not user:
+                        cur.execute("SELECT * FROM users WHERE id = %s LIMIT 1", (num_id,))
+                        user = cur.fetchone()
+                except ValueError:
+                    # 2. String user_id - check by guest email format
+                    guest_email = f"{user_id}@guest.gojo.et"
+                    cur.execute("SELECT * FROM users WHERE email = %s LIMIT 1", (guest_email,))
+                    user = cur.fetchone()
+                
+                # 3. If user doesn't exist, create one
+                if not user:
+                    if user_id.isdigit():
+                        num_id = int(user_id)
+                        email = f"tg_{user_id}@gojo.org.et"
+                        phone = f"TG-{user_id}"
+                        name = f"Telegram User {user_id}"
+                        cur.execute(
+                            "INSERT INTO users (telegram_id, name, f_name, l_name, phone, email, password, is_active) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, %s, 1)",
+                            (num_id, name, "Telegram", "User", phone, email, "tg_pass")
+                        )
+                        conn.commit()
+                        cur.execute("SELECT * FROM users WHERE telegram_id = %s LIMIT 1", (num_id,))
+                        user = cur.fetchone()
+                    else:
+                        guest_email = f"{user_id}@guest.gojo.et"
+                        phone = "0000000000"
+                        cur.execute(
+                            "INSERT INTO users (name, f_name, l_name, phone, email, password, is_active) "
+                            "VALUES (%s, 'Guest', 'User', %s, %s, 'guest_pass', 1)",
+                            (user_id, phone, guest_email)
+                        )
+                        conn.commit()
+                        cur.execute("SELECT * FROM users WHERE email = %s LIMIT 1", (guest_email,))
+                        user = cur.fetchone()
+            conn.close()
+            return user
+        except Exception as e:
+            logger.error(f"get_or_create_user error: {e}")
+            return None
+
+    def add_item_to_cart(self, user_id: str, product_name: str, quantity: int = 1) -> bool:
+        """
+        Resolve the user, resolve the product, get/generate cart_group_id,
+        and insert/update cart item in DB.
+        """
+        import time
+        import random
+        import string
+
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return False
+
+        customer_id = user["id"]
+        is_guest = 1 if not str(user_id).isdigit() else 0
+
+        try:
+            conn = self._get_connection()
+            product = None
+            with conn.cursor() as cur:
+                # 1. Resolve product details
+                cur.execute(
+                    "SELECT id, name, unit_price, slug, thumbnail, user_id "
+                    "FROM products WHERE name = %s AND status = 1 LIMIT 1",
+                    (product_name,)
+                )
+                product = cur.fetchone()
+
+                if not product:
+                    # Try fuzzy search
+                    cur.execute(
+                        "SELECT id, name, unit_price, slug, thumbnail, user_id "
+                        "FROM products WHERE name LIKE %s AND status = 1 LIMIT 1",
+                        (f"%{product_name}%",)
+                    )
+                    product = cur.fetchone()
+
+                if not product:
+                    conn.close()
+                    logger.warning(f"Product '{product_name}' not found in database.")
+                    return False
+
+                # 2. Get existing cart_group_id or generate a new one
+                cur.execute(
+                    "SELECT cart_group_id FROM carts WHERE customer_id = %s LIMIT 1",
+                    (customer_id,)
+                )
+                row = cur.fetchone()
+                if row and row["cart_group_id"]:
+                    cart_group_id = row["cart_group_id"]
+                else:
+                    rand_suffix = "".join(random.choices(string.ascii_letters, k=5))
+                    timestamp = int(time.time())
+                    prefix = "guest" if is_guest else str(customer_id)
+                    cart_group_id = f"{prefix}-{rand_suffix}-{timestamp}"
+
+                # 3. Check if product already in cart
+                cur.execute(
+                    "SELECT id, quantity FROM carts WHERE customer_id = %s AND product_id = %s LIMIT 1",
+                    (customer_id, product["id"])
+                )
+                existing = cur.fetchone()
+
+                if existing:
+                    new_qty = existing["quantity"] + quantity
+                    cur.execute(
+                        "UPDATE carts SET quantity = %s, price = %s, updated_at = NOW() WHERE id = %s",
+                        (new_qty, product["unit_price"], existing["id"])
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO carts (customer_id, cart_group_id, product_id, quantity, price, "
+                        "tax, discount, slug, name, thumbnail, seller_id, is_guest, created_at, updated_at) "
+                        "VALUES (%s, %s, %s, %s, %s, 0, 0, %s, %s, %s, %s, %s, NOW(), NOW())",
+                        (
+                            customer_id,
+                            cart_group_id,
+                            product["id"],
+                            quantity,
+                            product["unit_price"],
+                            product["slug"],
+                            product["name"],
+                            product["thumbnail"] or "def.png",
+                            product["user_id"],
+                            is_guest
+                        )
+                    )
+                conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"add_item_to_cart error: {e}")
+            return False
+
+    def get_cart_items_by_user(self, user_id: str) -> list[str]:
+        """Fetch list of product names in the user's cart."""
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return []
+
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT name FROM carts WHERE customer_id = %s", (user["id"],))
+                rows = cur.fetchall()
+            conn.close()
+            return [row["name"] for row in rows]
+        except Exception as e:
+            logger.error(f"get_cart_items_by_user error: {e}")
+            return []
+
+    def get_cart_details(self, user_id: str) -> dict:
+        """Fetch cart items with pricing, and the total amount."""
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return {"items": [], "total_price": 0.0}
+
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, name, quantity, price, slug, thumbnail "
+                    "FROM carts WHERE customer_id = %s",
+                    (user["id"],)
+                )
+                rows = cur.fetchall()
+            conn.close()
+
+            items = []
+            total_price = 0.0
+            for row in rows:
+                subtotal = float(row["price"]) * int(row["quantity"])
+                items.append({
+                    "id": row["id"],
+                    "name": row["name"],
+                    "quantity": row["quantity"],
+                    "price": float(row["price"]),
+                    "subtotal": subtotal,
+                    "slug": row["slug"],
+                    "thumbnail": row["thumbnail"]
+                })
+                total_price += subtotal
+
+            return {"items": items, "total_price": total_price}
+        except Exception as e:
+            logger.error(f"get_cart_details error: {e}")
+            return {"items": [], "total_price": 0.0}
+
+    def clear_cart(self, user_id: str) -> bool:
+        """Delete all items in user's cart."""
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return False
+
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM carts WHERE customer_id = %s", (user["id"],))
+                conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"clear_cart error: {e}")
+            return False
+
     @staticmethod
     def _normalise_order_id(raw) -> str:
         """
@@ -230,3 +456,4 @@ class DatabaseManager:
 
 # Singleton used across the app
 db = DatabaseManager()
+
