@@ -15,6 +15,35 @@ class GojoShopChatbot:
         self.faq_data = self.load_faq()
         self.db = db_manager          # injected DatabaseManager (or None)
         self.support_requests: List[Dict] = []
+        self.translations = self.load_translations()
+
+    def load_translations(self) -> Dict:
+        """Load localization files"""
+        translations = {}
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        i18n_dir = os.path.join(base_dir, "i18n")
+        for lang in ["en", "am"]:
+            path = os.path.join(i18n_dir, f"{lang}.json")
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        translations[lang] = json.load(f)
+                except Exception as e:
+                    print(f"Error loading {lang}.json: {e}")
+            else:
+                translations[lang] = {}
+        return translations
+
+    def translate(self, session: Dict, key: str, **kwargs) -> str:
+        """Helper to get translated string for active language in session"""
+        lang = session.get("language", "en")
+        text = self.translations.get(lang, {}).get("bot", {}).get(key)
+        if text is None:
+            text = self.translations.get("en", {}).get("bot", {}).get(key, key)
+        try:
+            return text.format(**kwargs)
+        except Exception:
+            return text
 
     def load_product_catalog(self) -> Dict:
         """Load product catalog (replace with actual DB/data)"""
@@ -61,23 +90,37 @@ class GojoShopChatbot:
     # Session helpers
     # ------------------------------------------------------------------
 
+    def save_session(self, user_id: str):
+        """Persist user session to database."""
+        if self.db is not None and hasattr(self.db, "save_user_session") and user_id in self.user_sessions:
+            self.db.save_user_session(user_id, self.user_sessions[user_id])
+
     def _ensure_session(self, user_id: str):
-        """Initialize session if it doesn't exist yet."""
+        """Initialize session if it doesn't exist yet, checking the database first."""
         if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = {
-                "user_id": user_id,
-                "conversation_history": [],
-                "current_intent": None,
-                "last_intent": None,
-                "last_product": None,
-                "last_products": [],
-                "last_search_keyword": None,
-                "last_product_filters": {},
-                "last_order_id": None,
-                "message_count": 0,
-                "human_support_requested": False,
-                "cart": []
-            }
+            session = None
+            if self.db is not None and hasattr(self.db, "get_user_session"):
+                session = self.db.get_user_session(user_id)
+            
+            if session is None:
+                session = {
+                    "user_id": user_id,
+                    "conversation_history": [],
+                    "current_intent": None,
+                    "last_intent": None,
+                    "last_product": None,
+                    "last_products": [],
+                    "last_search_keyword": None,
+                    "last_product_filters": {},
+                    "last_order_id": None,
+                    "message_count": 0,
+                    "human_support_requested": False,
+                    "cart": [],
+                    "language": "en"
+                }
+                if self.db is not None and hasattr(self.db, "save_user_session"):
+                    self.db.save_user_session(user_id, session)
+            self.user_sessions[user_id] = session
         else:
             self.user_sessions[user_id]["user_id"] = user_id
 
@@ -92,7 +135,10 @@ class GojoShopChatbot:
             self.db.clear_cart(user_id)
 
         self.user_sessions.pop(user_id, None)
+        if self.db is not None and hasattr(self.db, "delete_user_session"):
+            self.db.delete_user_session(user_id)
         self._ensure_session(user_id)
+
 
     def _record_turn(self, session: Dict, role: str, text: str, intent: str = None):
         """Store a structured conversation turn for context."""
@@ -112,11 +158,15 @@ class GojoShopChatbot:
 
     def _is_affirmative(self, message: str) -> bool:
         return message.lower().strip() in {
-            "yes", "yeah", "yep", "sure", "ok", "okay", "please", "y", "correct", "right"
+            "yes", "yeah", "yep", "sure", "ok", "okay", "please", "y", "correct", "right",
+            "አዎ", "እሺ", "ይሁን", "ትክክል", "አዎን"
         }
 
     def _is_negative(self, message: str) -> bool:
-        return message.lower().strip() in {"no", "nope", "nah", "not really", "n"}
+        return message.lower().strip() in {
+            "no", "nope", "nah", "not really", "n",
+            "አይ", "አይደለም", "አይሆንም", "አይደል"
+        }
 
     def _references_last_item(self, message: str) -> bool:
         message_lower = message.lower()
@@ -126,8 +176,9 @@ class GojoShopChatbot:
                 "that one", "this one", "the first", "first one", "second one",
                 "add it", "buy it", "get it", "purchase it", "order it",
                 "how much is it", "tell me more", "more about it", "about that",
+                "እሱን", "ይህንን", "ያንን", "ጨምረው", "ጨምሪው", "ግዛው", "ዋጋው ስንት ነው", "ስለ እሱ",
             ]
-        ) or message_lower.strip() in {"it", "that", "this"}
+        ) or message_lower.strip() in {"it", "that", "this", "እሱ", "ይሄ", "ያ"}
 
     def calc_typing_delay(self, response: str) -> int:
         """Estimate a natural typing delay in milliseconds."""
@@ -142,6 +193,36 @@ class GojoShopChatbot:
         """Pick a short, human-sounding bridge phrase based on context."""
         last_intent = session.get("last_intent")
         msg_count = session.get("message_count", 0)
+
+        if session.get("language") == "am":
+            if intent == "greeting":
+                hour = datetime.now().hour
+                if hour < 12:
+                    return random.choice(["እንደምን አደሩ! ", "ሰላም! "])
+                if hour < 17:
+                    return random.choice(["እንደምን ዋሉ! ", "ሰላም! "])
+                return random.choice(["እንደምን አመሹ! ", "ሰላም! "])
+
+            if msg_count > 2:
+                contextual_am = {
+                    "product_search": ["እሺ፣ ልፈልግልዎ። ", "አንድ አፍታ — እያፈላለግኩ ነው። ", "እሺ፣ አሁን እፈልጋለሁ። "],
+                    "order_lookup": ["በእርግጥ — ላምጣው። ", "እሺ፣ ትዕዛዝዎን እያረጋገጥኩ ነው። ", "አንድ ሰከንድ፣ እያየሁት ነው። "],
+                    "order_followup": ["ስለ ትዕዛዝዎ — ", "እሺ። ", "እሺ፣ ልፈትሽልዎ። "],
+                    "shipping": ["ስለ ማድረሻ ለመርዳት ደስተኛ ነኝ። ", "እሺ — ማድረሻ የሚከናወነው በዚህ መልኩ ነው። "],
+                    "returns": ["ምንም ችግር የለም። ", "እዚህ ላይ መርዳት እችላለሁ። "],
+                    "payment": ["በፍጹም። ", "እሺ — የክፍያ አማራጮቻችን እነዚህ ናቸው። "],
+                    "checkout": ["በጣም ጥሩ። ", "እሺ — "],
+                    "add_to_cart_id": ["ተከናውኗል! ", "እሺ — "],
+                    "add_last_product": ["ጥሩ ምርጫ ነው! ", "እሺ — "],
+                    "product_followup": ["ስለዚህ እቃ — ", "እሺ — "],
+                    "general": ["ተረድቻለሁ። ", "እሺ። ", "እሺ — "],
+                }
+                if intent in contextual_am:
+                    return random.choice(contextual_am[intent])
+
+            if last_intent == "product_search" and intent == "product_search":
+                return random.choice(["እየፈለግኩ ነው:: ", "ልፈልግልዎ:: "])
+            return ""
 
         if intent == "greeting":
             hour = datetime.now().hour
@@ -195,6 +276,21 @@ class GojoShopChatbot:
         session["message_count"] = session.get("message_count", 0) + 1
         self._record_turn(session, "user", message)
 
+        # Check for command to set language manually
+        lang_match = re.match(r'^/(?:language|lang)\s+(en|am)\b', message.lower().strip())
+        if lang_match:
+            new_lang = lang_match.group(1)
+            session["language"] = new_lang
+            self.save_session(user_id)
+            if new_lang == "am":
+                return "ቋንቋ ወደ አማርኛ ተቀይሯል።"
+            else:
+                return "Language set to English."
+
+        # Auto-detect if message contains Amharic script
+        if re.search(r'[\u1200-\u137f]', message):
+            session["language"] = "am"
+
         # Check for command to exit support mode
         if message.lower().strip() in {"exit", "reset", "stop support"}:
             active_req = self.get_active_support_request(user_id)
@@ -202,7 +298,9 @@ class GojoShopChatbot:
                 active_req["status"] = "resolved"
                 active_req["updated_at"] = datetime.now().isoformat()
                 session["human_support_requested"] = False
-                return "Support session ended. AI Chatbot is back! How can I help you now?"
+                session["current_intent"] = "general"
+                self.save_session(user_id)
+                return self.translate(session, "support_ended")
 
         # Check if user is actively in a live support request session
         active_req = self.get_active_support_request(user_id)
@@ -210,6 +308,7 @@ class GojoShopChatbot:
             # Add message to support chat history
             self.add_support_chat_message(active_req["id"], "user", message)
             # Return special token to indicate support mode
+            self.save_session(user_id)
             return "[SUPPORT_MODE]"
 
         intent = self.detect_intent(message, session)
@@ -219,6 +318,7 @@ class GojoShopChatbot:
         response = self.generate_response(intent, message, session)
         response = self._wrap_natural(response, session, intent)
         self._record_turn(session, "assistant", response, intent)
+        self.save_session(user_id)
         return response
 
     # ------------------------------------------------------------------
@@ -245,18 +345,18 @@ class GojoShopChatbot:
             return "farewell"
 
         if session.get("last_products") and self._references_last_item(message_lower):
-            if any(w in message_lower for w in ["add", "buy", "get", "purchase", "order"]):
+            if any(w in message_lower for w in ["add", "buy", "get", "purchase", "order", "ጨምር", "ግዛ", "እዘዝ"]):
                 return "add_last_product"
             return "product_followup"
 
         if session.get("last_search_keyword") and any(
             phrase in message_lower
-            for phrase in ["show more", "more options", "anything else", "other options", "see more"]
+            for phrase in ["show more", "more options", "anything else", "other options", "see more", "ተጨማሪ", "ሌላ"]
         ):
             return "repeat_search"
 
         if session.get("last_order_id") and any(
-            w in message_lower for w in ["status", "arrive", "when", "delivery", "update", "still", "delayed", "where is it"]
+            w in message_lower for w in ["status", "arrive", "when", "delivery", "update", "still", "delayed", "where is it", "ሁኔታ", "መቼ", "ማድረሻ", "የደረሰ"]
         ):
             return "order_followup"
 
@@ -267,7 +367,7 @@ class GojoShopChatbot:
             return "human_support"
 
         # --- Direct buy / add to cart commands (e.g. /buy_85 or buy 85) ---
-        if re.search(r'\b(buy|add)[-_\s]?(\d+)\b', message_lower) or message_lower.startswith('/buy_'):
+        if re.search(r'\b(buy|add|ግዛ|ጨምር)[-_\s]?(\d+)\b', message_lower) or message_lower.startswith('/buy_'):
             return "add_to_cart_id"
 
         if self._extract_product_filters(message_lower) and self._extract_search_keyword(message_lower):
@@ -278,40 +378,40 @@ class GojoShopChatbot:
         if re.search(r'\b(ord[-\s]?\d+|#\d{4,}|\d{4,})\b', message_lower):
             return "order_lookup"
         # Order-related phrases (with prior order context = follow-up)
-        if any(w in message_lower for w in ["my order", "order status", "track", "tracking", "where is my", "order number"]):
+        if any(w in message_lower for w in ["my order", "order status", "track", "tracking", "where is my", "order number", "ትዕዛዜ", "ትዕዛዝ", "ሁኔታ", "ቁጥር"]):
             return "order_lookup"
         # Follow-up on previously looked-up order
         if session.get("last_order_id") and any(
-            w in message_lower for w in ["status", "arrive", "when", "delivery", "update", "still", "delayed"]
+            w in message_lower for w in ["status", "arrive", "when", "delivery", "update", "still", "delayed", "ሁኔታ", "መቼ", "አድራሻ"]
         ):
             return "order_followup"
 
         # --- Payment (before checkout to avoid collision) ---
-        if any(w in message_lower for w in ["telebirr", "amole"]):
+        if any(w in message_lower for w in ["telebirr", "amole", "ቴሌብር", "አሞሌ", "ክፍያ"]):
             return "payment"
 
         # --- Product search and buy intents ---
-        if any(w in message_lower for w in ["buy", "purchase", "order", "price", "cost", "search", "find", "looking for", "recommend", "show me"]):
+        if any(w in message_lower for w in ["buy", "purchase", "order", "price", "cost", "search", "find", "looking for", "recommend", "show me", "ግዛ", "ፈልግ", "አሳይ", "ዋጋው", "እፈልጋለሁ"]):
             return "product_search"
-        if any(w in message_lower for w in ["cart", "checkout"]):
+        if any(w in message_lower for w in ["cart", "checkout", "ጋሪ", "ክፈል"]):
             return "checkout"
 
         # --- Support ---
-        if any(w in message_lower for w in ["shipping", "delivery", "arrive"]):
+        if any(w in message_lower for w in ["shipping", "delivery", "arrive", "ማድረሻ", "አቅርቦት", "መቼ"]):
             return "shipping"
-        if any(w in message_lower for w in ["return", "refund", "exchange", "defective"]):
+        if any(w in message_lower for w in ["return", "refund", "exchange", "defective", "መመለስ", "ተመላሽ", "ቀይር"]):
             return "returns"
-        if any(w in message_lower for w in ["payment", "pay", "card", "visa", "mastercard"]):
+        if any(w in message_lower for w in ["payment", "pay", "card", "visa", "mastercard", "ክፍያ", "ካርድ"]):
             return "payment"
-        if any(w in message_lower for w in ["warranty", "repair", "broken", "damage"]):
+        if any(w in message_lower for w in ["warranty", "repair", "broken", "damage", "ዋስትና", "ጥገና", "የተሰበረ"]):
             return "warranty"
 
         # --- General ---
-        if any(w in message_lower for w in ["help", "support", "assist", "problem"]):
+        if any(w in message_lower for w in ["help", "support", "assist", "problem", "እርዳታ", "እገዛ", "ችግር"]):
             return "help"
-        if any(w in message_lower for w in ["hello", "hi", "hey", "good morning", "selam"]):
+        if any(w in message_lower for w in ["hello", "hi", "hey", "good morning", "selam", "ሰላም", "እንደምን"]):
             return "greeting"
-        if any(w in message_lower for w in ["bye", "goodbye", "see you", "thanks", "thank"]):
+        if any(w in message_lower for w in ["bye", "goodbye", "see you", "thanks", "thank", "ቻው", "ደህና ሁን", "ምስጋና"]):
             return "farewell"
 
         # Bare product keyword search (e.g. "baby shoes", "leather bag")
@@ -329,29 +429,41 @@ class GojoShopChatbot:
             "call me", "representative", "operator", "staff member", "not a bot",
             "not helping", "useless", "frustrated", "complaint", "supervisor", "manager",
             "speak to human", "talk to human", "connect me", "transfer me",
+            "ከሰው", "ሰው ጋር", "የደንበኛ", "ወኪል", "አገናኝ", "ከተወካይ"
         ]
         return any(phrase in message_lower for phrase in phrases)
 
     def log_support_request(self, user_id: str, message: str, session: Dict) -> Dict:
         """Record a human-support handoff for follow-up."""
-        entry = {
-            "id": f"SUP-{len(self.support_requests) + 1:05d}",
-            "status": "open",
-            "user_id": user_id,
-            "message": message,
-            "timestamp": datetime.now().isoformat(),
+        metadata = {
             "last_intent": session.get("current_intent"),
             "last_order_id": session.get("last_order_id"),
             "last_search_keyword": session.get("last_search_keyword"),
             "cart": list(session.get("cart", [])),
-            "messages": [
-                {
-                    "sender": "user",
-                    "text": message,
-                    "timestamp": datetime.now().isoformat()
-                }
-            ],
         }
+        
+        entry = None
+        if self.db is not None and hasattr(self.db, "create_support_request"):
+            req_id = f"SUP-{random.randint(10000, 99999)}"
+            entry = self.db.create_support_request(req_id, user_id, message, metadata)
+
+        if not entry:
+            entry = {
+                "id": f"SUP-{len(self.support_requests) + 1:05d}",
+                "status": "open",
+                "user_id": user_id,
+                "message": message,
+                "timestamp": datetime.now().isoformat(),
+                "metadata": metadata,
+                "messages": [
+                    {
+                        "sender": "user",
+                        "text": message,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                ],
+            }
+        
         self.support_requests.append(entry)
         if len(self.support_requests) > 200:
             self.support_requests = self.support_requests[-200:]
@@ -360,6 +472,10 @@ class GojoShopChatbot:
 
     def get_active_support_request(self, user_id: str) -> Optional[Dict]:
         """Get the current active support request (open or in_progress) for a user."""
+        if self.db is not None and hasattr(self.db, "get_active_support_request"):
+            db_req = self.db.get_active_support_request(user_id)
+            if db_req:
+                return db_req
         for req in reversed(self.support_requests):
             if req.get("user_id") == user_id and req.get("status") in {"open", "in_progress"}:
                 return req
@@ -367,6 +483,14 @@ class GojoShopChatbot:
 
     def add_support_chat_message(self, request_id: str, sender: str, text: str) -> Optional[Dict]:
         """Add a message to the support chat history."""
+        if self.db is not None and hasattr(self.db, "add_support_message"):
+            db_msg = self.db.add_support_message(request_id, sender, text)
+            if db_msg:
+                # Also update in-memory object if present
+                for req in self.support_requests:
+                    if req.get("id") == request_id:
+                        req.setdefault("messages", []).append(db_msg)
+                return db_msg
         for req in self.support_requests:
             if req.get("id") == request_id:
                 msg = {
@@ -378,17 +502,28 @@ class GojoShopChatbot:
                 return msg
         return None
 
+    def list_support_requests(self, limit: int = 50) -> List[Dict]:
+        """List support requests from DB or memory."""
+        if self.db is not None and hasattr(self.db, "list_support_requests"):
+            db_requests = self.db.list_support_requests(limit)
+            if db_requests:
+                return db_requests
+        return self.support_requests[-limit:]
 
     def update_support_request_status(self, request_id: str, status: str) -> Dict | None:
-        """Update an in-memory support request status for the admin page."""
+        """Update support request status in DB and memory."""
         if status not in {"open", "in_progress", "resolved"}:
             return None
+        updated_db = None
+        if self.db is not None and hasattr(self.db, "update_support_request_status"):
+            updated_db = self.db.update_support_request_status(request_id, status)
+        
         for request in self.support_requests:
             if request.get("id") == request_id:
                 request["status"] = status
                 request["updated_at"] = datetime.now().isoformat()
                 return request
-        return None
+        return updated_db
 
     # ------------------------------------------------------------------
     # Response dispatcher
@@ -422,34 +557,33 @@ class GojoShopChatbot:
     # ------------------------------------------------------------------
     # Intent handlers
     # ------------------------------------------------------------------
-
     def handle_greeting(self, message: str, session: Dict) -> str:
         shop = os.getenv("SHOP_NAME", "GojoShop.et")
         is_returning = session.get("message_count", 1) > 1
 
         if is_returning and session.get("last_search_keyword"):
-            return (
-                f"Welcome back to {shop}! 👋\n"
-                f"Still thinking about **{session['last_search_keyword']}**, or looking for something else?"
+            return self.translate(
+                session, "welcome_back_search",
+                shop=shop, keyword=session["last_search_keyword"]
             )
         if is_returning and session.get("cart"):
-            return (
-                f"Hey again! 👋 You still have **{len(session['cart'])} item(s)** in your cart. "
-                "Want to keep shopping or head to checkout?"
+            return self.translate(
+                session, "welcome_back_cart",
+                shop=shop, cart_len=len(session["cart"])
             )
         if is_returning:
-            return f"Hey, welcome back to {shop}! 👋 What can I help you with today?"
+            return self.translate(session, "welcome_back_general", shop=shop)
 
         greetings = [
-            f"👋 Hello! Welcome to {shop}! I'm here to help you find products, track orders, or answer any questions.",
-            f"ሰላም! Welcome to {shop}! What are you shopping for today?",
-            f"Hey there! 👋 I'm your {shop} assistant. Tell me what you're looking for and I'll help you out.",
+            self.translate(session, "greeting_1", shop=shop),
+            self.translate(session, "greeting_2", shop=shop),
+            self.translate(session, "greeting_3", shop=shop),
         ]
         return random.choice(greetings)
 
     def handle_product_search(self, message: str, session: Dict) -> str:
         if self.db is None:
-            return "⚠️ Live product database is currently offline. Please try again later."
+            return self.translate(session, "db_offline")
 
         filters = self._extract_product_filters(message)
         keyword = self._extract_search_keyword(message)
@@ -458,17 +592,11 @@ class GojoShopChatbot:
             if not filters and session.get("last_product_filters"):
                 filters = dict(session["last_product_filters"])
         if not keyword:
-            return (
-                "🔍 What kind of products are you looking for?\n"
-                "We have an extensive catalog including Teddy Bears, handmade earrings, leather bags, coasters, and baby shoes!"
-            )
+            return self.translate(session, "product_search_prompt")
 
         products = self.db.search_products(keyword, limit=10, filters=filters)
         if not products:
-            return (
-                f"🔍 I couldn't find anything matching **\"{keyword}\"** right now.\n"
-                "You could try \"bear\", \"earring\", \"bag\", or \"shoes\" — or describe what you need in your own words."
-            )
+            return self.translate(session, "product_not_found", keyword=keyword)
 
         exclude_ids = [int(p["id"]) for p in products if p.get("id") is not None]
         recommendations = []
@@ -483,237 +611,93 @@ class GojoShopChatbot:
 
     def handle_add_to_cart_id(self, message: str, session: Dict) -> str:
         """Add a specific product ID directly to cart."""
-        m = re.search(r'(?:buy|add)[-_]?(\d+)', message.lower())
+        m = re.search(r'(?:buy|add|ግዛ|ጨምር)[-_]?(\d+)', message.lower())
         if not m and message.startswith('/buy_'):
             m = re.match(r'/buy_(\d+)', message)
 
         if not m:
-            return "Which product would you like to add? Please specify the product ID or search for it."
+            return self.translate(session, "specify_product_id")
 
         pid = int(m.group(1))
         if self.db is None:
-            return "⚠️ Database offline. Cannot add item by ID."
+            return self.translate(session, "cart_db_offline")
 
         product = self.db.get_product_by_id(pid)
         if not product:
-            return f"❌ Sorry, I couldn't find a product with ID {pid}."
+            return self.translate(session, "product_id_not_found", pid=pid)
 
         user_id = session.get("user_id", "default")
         self.add_to_cart(user_id, product["name"])
         session["last_product"] = product
         cart_count = len(session.get("cart", []))
-        return (
-            f"🛒 **{product['name']}** is in your cart now! "
-            f"You have {cart_count} item(s). Say **checkout** whenever you're ready."
+        return self.translate(
+            session, "cart_added_checkout_ready",
+            product_name=product["name"], cart_count=cart_count
         )
 
     def handle_add_last_product(self, message: str, session: Dict) -> str:
         """Add the most recently viewed product to cart."""
         product = session.get("last_product")
         if not product:
-            return "Which product did you mean? Search for something first, or tell me the product ID."
+            return self.translate(session, "specify_product_id")
 
         user_id = session.get("user_id", "default")
         self.add_to_cart(user_id, product["name"])
         cart_count = len(session.get("cart", []))
-        return (
-            f"🛒 Added **{product['name']}** to your cart! "
-            f"That's {cart_count} item(s) so far. Ready to checkout?"
+        return self.translate(
+            session, "cart_added_generic",
+            product_name=product["name"], cart_count=cart_count
         )
 
     def handle_product_followup(self, message: str, session: Dict) -> str:
         """Answer follow-up questions about the last viewed product."""
         product = session.get("last_product")
         if not product:
-            return "I'm not sure which product you mean — could you search for it again or share the name?"
+            return self.translate(session, "product_id_not_found", pid="")
 
         message_lower = message.lower()
         price = float(product.get("unit_price", 0))
         stock = product.get("current_stock", 0)
         name = product.get("name", "that item")
 
-        if any(w in message_lower for w in ["price", "cost", "how much"]):
-            return (
-                f"**{name}** is **{price:,.2f} ETB**. "
-                f"{'We have it in stock!' if stock else 'It may be out of stock right now.'} "
-                f"Want me to add it to your cart?"
+        if any(w in message_lower for w in ["price", "cost", "how much", "ዋጋ", "ስንት"]):
+            stock_status = self.translate(session, "in_stock_msg") if stock else self.translate(session, "out_of_stock_msg")
+            return self.translate(
+                session, "product_price_status",
+                name=name, price=f"{price:,.2f}", stock_status=stock_status
             )
 
         raw_details = product.get("details") or ""
         clean_desc = re.sub(r'<[^>]*>', '', raw_details).strip()
         if not clean_desc:
-            clean_desc = f"A quality item from {os.getenv('SHOP_NAME', 'GojoShop.et')}."
+            shop_name = os.getenv("SHOP_NAME", "GojoShop.et")
+            clean_desc = f"A quality item from {shop_name}."
 
-        return (
-            f"Here's more on **{name}**:\n"
-            f"• Price: {price:,.2f} ETB\n"
-            f"• Stock: {stock if stock is not None else 0}\n"
-            f"• {clean_desc[:180]}{'...' if len(clean_desc) > 180 else ''}\n\n"
-            f"Say **add it** if you'd like it in your cart."
+        details_truncated = clean_desc[:180] + ("..." if len(clean_desc) > 180 else "")
+        return self.translate(
+            session, "product_details_more",
+            name=name, price=f"{price:,.2f}", stock=(stock if stock is not None else 0), details=details_truncated
         )
 
     def handle_repeat_search(self, message: str, session: Dict) -> str:
         """Re-run the last product search."""
         keyword = session.get("last_search_keyword")
         if not keyword:
-            return "What should I search for? Tell me the product type or name you're interested in."
+            return self.translate(session, "repeat_search_empty")
         filter_phrase = self._format_filter_phrase(session.get("last_product_filters", {}))
         return self.handle_product_search(f"search {keyword} {filter_phrase}", session)
 
-    def _extract_product_filters(self, message: str) -> Dict:
-        """Extract product filters from natural language."""
-        text = message.lower()
-        filters: Dict = {}
-
-        under = re.search(r'\b(?:under|below|less than|max|maximum)\s*(?:etb|birr)?\s*(\d+(?:\.\d+)?)', text)
-        over = re.search(r'\b(?:over|above|more than|min|minimum)\s*(?:etb|birr)?\s*(\d+(?:\.\d+)?)', text)
-        between = re.search(r'\bbetween\s*(\d+(?:\.\d+)?)\s*(?:and|-|to)\s*(\d+(?:\.\d+)?)', text)
-        if between:
-            low, high = sorted([float(between.group(1)), float(between.group(2))])
-            filters["min_price"] = low
-            filters["max_price"] = high
-        else:
-            if under:
-                filters["max_price"] = float(under.group(1))
-            if over:
-                filters["min_price"] = float(over.group(1))
-
-        if any(phrase in text for phrase in ["in stock", "available only", "available now", "not sold out"]):
-            filters["in_stock"] = True
-
-        if any(phrase in text for phrase in ["cheapest", "lowest price", "price low", "low to high"]):
-            filters["sort"] = "price_asc"
-        elif any(phrase in text for phrase in ["expensive", "highest price", "price high", "high to low"]):
-            filters["sort"] = "price_desc"
-        elif any(phrase in text for phrase in ["newest", "latest", "recent"]):
-            filters["sort"] = "newest"
-
-        return filters
-
-    def _extract_search_keyword(self, message: str) -> str:
-        """Extract the core search keyword from user message."""
-        text = message.lower()
-        text = re.sub(r'\bbetween\s*\d+(?:\.\d+)?\s*(?:and|-|to)\s*\d+(?:\.\d+)?', ' ', text)
-        text = re.sub(r'\b(?:under|below|less than|max|maximum|over|above|more than|min|minimum)\s*(?:etb|birr)?\s*\d+(?:\.\d+)?', ' ', text)
-        text = re.sub(r'\b(?:in stock|available only|available now|not sold out|cheapest|lowest price|price low|low to high|expensive|highest price|price high|high to low|newest|latest|recent)\b', ' ', text)
-        text = re.sub(r'[^\w\s]', '', text)
-        # Remove common stopwords
-        stopwords = {
-            "i", "want", "to", "buy", "purchase", "order", "search", "find", "looking", "for", 
-            "please", "show", "me", "a", "an", "the", "need", "any", "some", "can", "you", 
-            "get", "recommend", "recommendations", "have", "product", "products", "item", "items",
-            "filter", "filters", "sort", "by", "only", "etb", "birr"
-        }
-        words = [w for w in text.split() if w not in stopwords]
-        return " ".join(words) if words else ""
-
-    def _format_filter_phrase(self, filters: Dict) -> str:
-        parts = []
-        if filters.get("min_price") is not None:
-            parts.append(f"over {filters['min_price']:g}")
-        if filters.get("max_price") is not None:
-            parts.append(f"under {filters['max_price']:g}")
-        if filters.get("in_stock"):
-            parts.append("in stock")
-        sort_labels = {
-            "price_asc": "cheapest",
-            "price_desc": "highest price",
-            "newest": "newest",
-        }
-        if filters.get("sort") in sort_labels:
-            parts.append(sort_labels[filters["sort"]])
-        return " ".join(parts)
-
-    def _format_filter_meta(self, filters: Dict) -> str:
-        if not filters:
-            return "none"
-        parts = []
-        if filters.get("min_price") is not None:
-            parts.append(f"min_price={filters['min_price']:g}")
-        if filters.get("max_price") is not None:
-            parts.append(f"max_price={filters['max_price']:g}")
-        if filters.get("in_stock"):
-            parts.append("in_stock=true")
-        if filters.get("sort"):
-            parts.append(f"sort={filters['sort']}")
-        return "; ".join(parts)
-
-    def _format_product_block(self, product: Dict) -> str:
-        raw_details = product.get("details") or ""
-        clean_desc = re.sub(r'<[^>]*>', '', raw_details).strip()
-        clean_desc = (clean_desc[:70] + "...") if len(clean_desc) > 70 else clean_desc
-        if not clean_desc:
-            shop_name = os.getenv("SHOP_NAME", "GojoShop.et")
-            clean_desc = f"Quality product from {shop_name}."
-
-        return (
-            f"Product ID: {product['id']}\n"
-            f"Name: {product['name']}\n"
-            f"Price: {float(product['unit_price']):,.2f} ETB\n"
-            f"Stock: {product['current_stock'] if product['current_stock'] is not None else 0}\n"
-            f"Image: {product['thumbnail'] or 'def.png'}\n"
-            f"Details: {clean_desc}\n"
-        )
-
-    def _format_product_search_card(
-        self,
-        products: List[Dict],
-        filters: Dict | None = None,
-        recommendations: List[Dict] | None = None,
-    ) -> str:
-        """Format a list of database products into a machine-parseable search card block."""
-        filters = filters or {}
-        recommendations = recommendations or []
-        card = "━━━ PRODUCT SEARCH ━━━\n"
-        card += f"Filters: {self._format_filter_meta(filters)}\n"
-        for i, p in enumerate(products):
-            card += self._format_product_block(p)
-            if i < len(products) - 1:
-                card += "---\n"
-        if recommendations:
-            card += "\n━━━ RECOMMENDATIONS ━━━\n"
-            for i, rec in enumerate(recommendations):
-                card += self._format_product_block(rec)
-                if i < len(recommendations) - 1:
-                    card += "---\n"
-        card += "━━━━━━━━━━━━━━━━━━━━━━"
-        return card
-
     def handle_shipping(self, message: str, session: Dict) -> str:
-        return """🚚 Shipping Information:
-• Standard delivery: 2-5 business days (Free over 5000 ETB)
-• Express delivery: 1-2 business days (300 ETB)
-• Same-day delivery available in Addis Ababa (500 ETB)
-• Track your order with the tracking number sent to your email
-
-Would you like to check delivery status for your order?"""
+        return self.translate(session, "shipping_info")
 
     def handle_returns(self, message: str, session: Dict) -> str:
-        return """🔄 Return Policy:
-• 30-day return window from delivery date
-• Items must be unused and in original packaging
-• Free returns for defective items
-• Restocking fee for non-defective returns
-
-To start a return, visit your orders page or contact our support team."""
+        return self.translate(session, "returns_info")
 
     def handle_payment(self, message: str, session: Dict) -> str:
-        return """💳 Payment Methods:
-• Telebirr - Quick and easy
-• Amole - Available at any branch
-• Credit/Debit Cards (Visa, Mastercard)
-• Cash on Delivery
-
-All payments are secure and encrypted. Need help with a specific payment method?"""
+        return self.translate(session, "payment_info")
 
     def handle_warranty(self, message: str, session: Dict) -> str:
-        return """🔧 Warranty Information:
-• 1-year manufacturer warranty on all electronics
-• 6-month warranty on clothing and accessories
-• Extended warranty available for purchase (up to 3 years)
-• Warranty covers manufacturing defects, not accidental damage
-
-For warranty claims, visit our store or contact support with your receipt."""
+        return self.translate(session, "warranty_info")
 
     def handle_checkout(self, message: str, session: Dict) -> str:
         user_id = session.get("user_id", "default")
@@ -726,36 +710,24 @@ For warranty claims, visit our store or contact support with your receipt."""
             total_price = details.get("total_price", 0.0)
             
             if not items:
-                return "Your cart is empty. Would you like to browse our products?"
+                return self.translate(session, "checkout_empty")
                 
             item_lines = ""
             for item in items:
                 item_lines += f"\n• {item['name']} × {item['quantity']}  —  {item['subtotal']:,.2f} ETB"
                 
-            return (
-                f"🛒 **Your Cart Summary:**\n"
-                f"{item_lines}\n\n"
-                f"💰 **Total Amount: {total_price:,.2f} ETB**\n\n"
-                f"Would you like to proceed to checkout? I can help you with payment and delivery details."
+            return self.translate(
+                session, "checkout_summary",
+                item_lines=item_lines, total_price=f"{total_price:,.2f}"
             )
             
         cart_items = session.get("cart", [])
         if not cart_items:
-            return "Your cart is empty. Would you like to browse our products?"
-        return f"You have {len(cart_items)} item(s) in your cart. Proceed to checkout? I can help you with payment and delivery."
+            return self.translate(session, "checkout_empty")
+        return self.translate(session, "checkout_count", cart_len=len(cart_items))
 
     def handle_help(self, message: str, session: Dict) -> str:
-        return """🆘 How can I help you?
-Here's what I can assist with:
-1. 📱 Product search and recommendations
-2. 🛒 Purchasing and checking out
-3. 🚚 Shipping and delivery status
-4. 🔄 Returns and exchanges
-5. 💳 Payment methods
-6. 🔧 Warranty information
-7. 📦 Order tracking — just share your Order ID (e.g. ORD-1001)
-
-If you'd rather speak with a person, just say **"talk to human"** and I'll connect you with our support team."""
+        return self.translate(session, "help_info")
 
     def handle_human_support(self, message: str, session: Dict) -> str:
         """Hand off to a human support agent."""
@@ -765,31 +737,33 @@ If you'd rather speak with a person, just say **"talk to human"** and I'll conne
 
         shop = os.getenv("SHOP_NAME", "GojoShop.et")
         if already_requested:
-            intro = random.choice([
-                "I've flagged your chat for our support team. ",
-                "No problem — a real person can take it from here. ",
-                "Understood. I'm connecting you with our team now. ",
-            ])
+            intro_keys = [
+                "human_support_already_requested_1",
+                "human_support_already_requested_2",
+                "human_support_already_requested_3"
+            ]
         else:
-            intro = random.choice([
-                "Of course — sometimes it's better to talk to a real person. ",
-                "Sure, I'll get you to our support team. ",
-                "Absolutely. Let me connect you with someone from our team. ",
-            ])
+            intro_keys = [
+                "human_support_request_1",
+                "human_support_request_2",
+                "human_support_request_3"
+            ]
+        intro = self.translate(session, random.choice(intro_keys))
 
         context_note = ""
         if session.get("last_order_id"):
-            context_note = f"\nI've noted you were asking about order **{session['last_order_id']}**."
+            context_note = self.translate(session, "human_support_order_note", order_id=session['last_order_id'])
         elif session.get("last_search_keyword"):
-            context_note = f"\nI've noted you were looking at **{session['last_search_keyword']}**."
+            context_note = self.translate(session, "human_support_search_note", keyword=session['last_search_keyword'])
 
-        return intro + context_note + "\n\n" + self._format_support_card(shop)
+        return intro + context_note + "\n\n" + self._format_support_card(shop, session)
 
-    def _format_support_card(self, shop: str) -> str:
+    def _format_support_card(self, shop: str, session: Dict) -> str:
         """Rich support card with contact options."""
         email = os.getenv("SHOP_SUPPORT_EMAIL", "support@gojoshop.et")
         phone = os.getenv("SHOP_SUPPORT_PHONE", "+251911234567")
         hours = os.getenv("SHOP_SUPPORT_HOURS", "Mon–Sat, 9:00 AM – 6:00 PM EAT")
+        note = self.translate(session, "human_support_note")
 
         return (
             "━━━ HUMAN SUPPORT ━━━\n"
@@ -797,51 +771,34 @@ If you'd rather speak with a person, just say **"talk to human"** and I'll conne
             f"Email: {email}\n"
             f"Phone: {phone}\n"
             f"Hours: {hours}\n"
-            "Note: A support agent will follow up on this chat as soon as possible.\n"
+            f"Note: {note}\n"
             "━━━━━━━━━━━━━━━━━━━━━━"
         )
-
     def handle_farewell(self, message: str, session: Dict) -> str:
         shop = os.getenv("SHOP_NAME", "GojoShop.et")
         if self._is_negative(message.lower().strip()):
-            return random.choice([
-                "No worries at all! Let me know if you change your mind. 😊",
-                "That's okay — I'm here whenever you need help.",
-                "Alright! Feel free to ask if anything else comes up.",
-            ])
+            farewells_neg = [
+                self.translate(session, "farewell_negative_1"),
+                self.translate(session, "farewell_negative_2"),
+                self.translate(session, "farewell_negative_3"),
+            ]
+            return random.choice(farewells_neg)
         farewells = [
-            f"Thank you for stopping by {shop}! Come back anytime! 🛍️",
-            "You're welcome! Have a great day! 👋",
-            f"Thanks for chatting — hope to see you again at {shop}!",
+            self.translate(session, "farewell_1", shop=shop),
+            self.translate(session, "farewell_2", shop=shop),
+            self.translate(session, "farewell_3", shop=shop),
         ]
         return random.choice(farewells)
 
     def handle_general(self, message: str, session: Dict) -> str:
         if session.get("last_search_keyword"):
             kw = session["last_search_keyword"]
-            return (
-                f"I can tell you more about **{kw}**, help you add something to your cart, "
-                "or answer questions about shipping, returns, and orders.\n\n"
-                "What would you like to do next?"
-            )
+            return self.translate(session, "general_search_kw", kw=kw)
         if session.get("last_order_id"):
-            return (
-                f"We were just looking at order **{session['last_order_id']}**. "
-                "Ask about its status, delivery, or start a new search — whatever you need."
-            )
+            return self.translate(session, "general_order_context", order_id=session['last_order_id'])
         if session.get("cart"):
-            return (
-                f"You have **{len(session['cart'])} item(s)** in your cart. "
-                "I can help you checkout, find more products, or answer shop questions."
-            )
-        return """I'm here to help! You can ask me things like:
-• "Show me leather bags" — product search
-• "Track order ORD-1001" — order status
-• "Shipping info" or "return policy"
-• "Checkout" when you're ready to buy
-• "Talk to human" — speak with our support team
-
-What would you like to know?"""
+            return self.translate(session, "general_cart_items", cart_len=len(session['cart']))
+        return self.translate(session, "general_help")
 
     # ------------------------------------------------------------------
     # Order lookup handlers
@@ -853,44 +810,34 @@ What would you like to know?"""
         order_id_raw = self._extract_order_id(message)
 
         if not order_id_raw:
-            return (
-                "📦 Sure! Please share your Order ID to track your order.\n"
-                "It looks like: **ORD-1001** (found in your confirmation email or SMS)."
-            )
+            return self.translate(session, "order_lookup_prompt")
 
         if self.db is None:
-            return (
-                "⚠️ Order lookup is temporarily unavailable. "
-                "Please contact support at support@gojoshop.et or call +251911234567."
-            )
+            return self.translate(session, "order_lookup_db_offline")
 
         order = self.db.get_order(order_id_raw)
 
         if order is None:
-            return (
-                f"❌ I couldn't find an order with ID **{order_id_raw.upper()}**.\n"
-                "Please double-check the order ID in your confirmation email or SMS, "
-                "or contact us at support@gojoshop.et."
-            )
+            return self.translate(session, "order_lookup_not_found", order_id=order_id_raw.upper())
 
         # Store in session for follow-ups
         session["last_order_id"] = order["id"]
 
         items = self.db.get_order_items(order["id"])
-        return self._format_order_card(order, items)
+        return self._format_order_card(order, items, session)
 
     def handle_order_followup(self, message: str, session: Dict) -> str:
         """Handle follow-up questions about the last looked-up order."""
         order_id = session.get("last_order_id")
         if not order_id or self.db is None:
-            return "Could you share your Order ID? It looks like ORD-1001."
+            return self.translate(session, "order_lookup_prompt")
 
         order = self.db.get_order(order_id)
         if not order:
-            return f"I'm having trouble retrieving order {order_id}. Please try again."
+            return self.translate(session, "order_lookup_not_found", order_id=order_id)
 
         items = self.db.get_order_items(order_id)
-        return self._format_order_card(order, items)
+        return self._format_order_card(order, items, session)
 
     # ------------------------------------------------------------------
     # Formatting helpers
@@ -903,7 +850,7 @@ What would you like to know?"""
         Returns the raw matched string (normalised by DatabaseManager).
         """
         patterns = [
-            r'\b(ORD[-\s]?\d+)\b',   # ORD-1001 or ORD 1001
+            r'\b(ORD[-_\s]?\d+)\b',   # ORD-1001 or ORD 1001
             r'#(\d{4,})',             # #1001
             r'\b(\d{4,})\b',         # bare 4+ digit number
         ]
@@ -921,9 +868,10 @@ What would you like to know?"""
             "shipped":    "🚚",
             "delivered":  "✅",
             "cancelled":  "❌",
+            "canceled":   "❌",
         }.get(status, "📦")
 
-    def _format_order_card(self, order: dict, items: list) -> str:
+    def _format_order_card(self, order: dict, items: list, session: Dict) -> str:
         """Format order info as a rich text card for the chat bubble."""
         status      = order.get("order_status", order.get("status", "unknown"))
         emoji       = self._status_emoji(status)
@@ -952,10 +900,8 @@ What would you like to know?"""
         item_lines = ""
         for it in items:
             subtotal = float(it["unit_price"]) * int(it["quantity"])
-            # Get delivery status for this item if available
             item_delivery_status = it.get("delivery_status", "pending")
             item_emoji = self._status_emoji(item_delivery_status)
-            # Include product ID and variant if available
             product_id = it.get("product_id", "N/A")
             variant = it.get("variant", "N/A")
             item_lines += f"\n  • {it['product_name']} × {it['quantity']}  —  {subtotal:,.2f} ETB {item_emoji}"
@@ -989,23 +935,137 @@ What would you like to know?"""
         )
 
         # Add cancellation info if applicable
-        if status == "canceled":
+        if status in ("canceled", "cancelled"):
             card += f"❌ Cancellation Reason: {cancel_reason}\n"
             if cancel_cause != "N/A":
                 card += f"🔍 Cancel Cause ID: {cancel_cause}\n"
-            card += "Refunds are processed within 5 business days."
+            card += self.translate(session, "refund_note")
 
         # Add status-specific message
-        if status == "delivered":
-            card += "✅ Your order has been delivered! Enjoying your purchase? 😊"
-        elif status == "shipped":
-            card += "🚚 Your order is on its way! Expected delivery in 1-2 days."
-        elif status == "processing":
-            card += "⚙️ We're preparing your order. It will ship soon!"
-        elif status == "pending":
-            card += "🕐 Your order is confirmed and awaiting processing."
-        elif status == "cancelled":
-            card += "❌ This order was cancelled. Refunds are processed within 5 business days."
+        status_norm = "cancelled" if status in ("cancelled", "canceled") else status
+        status_key = f"order_status_{status_norm}"
+        card += self.translate(session, status_key)
+        return card
+
+    # ------------------------------------------------------------------
+    # Product search helpers
+    # ------------------------------------------------------------------
+
+    def _extract_search_keyword(self, message: str) -> str | None:
+        """Extract a product search keyword from the message."""
+        message_lower = message.lower().strip()
+
+        # Strip common filler phrases to isolate the keyword
+        filler = [
+            r"^(show me|search for|find|i'm looking for|looking for|i want to buy|want to buy|i want|i need to buy|need to buy|do you have|"
+            r"can i get|i need|buy|get me|what about|tell me about|ፈልግ|አሳይ|እፈልጋለሁ|ግዛ)\s+",
+            r"\s+(please|pls|now|today|asap)$",
+            r"\b(a|an|the|some|any)\b\s*",
+        ]
+        kw = message_lower
+        for pat in filler:
+            kw = re.sub(pat, "", kw, flags=re.IGNORECASE).strip()
+
+        # Remove filter phrases so they don't pollute the keyword
+        kw = re.sub(
+            r"\b(under|below|above|over|max|min|cheaper than|more than|less than|"
+            r"in stock|available|cheapest|newest|sort by|price asc|price desc)\b.*",
+            "", kw, flags=re.IGNORECASE
+        ).strip()
+        kw = re.sub(r"\s{2,}", " ", kw).strip()
+
+        # Must be at least 2 characters and not a pure number
+        if len(kw) >= 2 and not kw.isdigit():
+            return kw
+        return None
+
+    def _extract_product_filters(self, message: str) -> dict:
+        """Extract price / stock / sort filters from the message."""
+        filters: dict = {}
+        message_lower = message.lower()
+
+        # Price filters: "under 500", "below 1000", "max 2000"
+        m = re.search(r"\b(?:under|below|less than|max(?:imum)?|ቢበዛ)\s*(\d+[\d,]*)", message_lower)
+        if m:
+            filters["max_price"] = float(m.group(1).replace(",", ""))
+
+        m = re.search(r"\b(?:above|over|more than|min(?:imum)?|at least|ቢያንስ)\s*(\d+[\d,]*)", message_lower)
+        if m:
+            filters["min_price"] = float(m.group(1).replace(",", ""))
+
+        # Stock filter
+        if re.search(r"\b(in stock|available|ክምችት ላይ|available now)\b", message_lower):
+            filters["in_stock"] = True
+
+        # Sort filter
+        if re.search(r"\b(cheapest|lowest price|cheapest first|price asc|ርካሽ)\b", message_lower):
+            filters["sort"] = "price_asc"
+        elif re.search(r"\b(most expensive|highest price|price desc|ውድ)\b", message_lower):
+            filters["sort"] = "price_desc"
+        elif re.search(r"\b(newest|latest|new arrivals|አዲስ)\b", message_lower):
+            filters["sort"] = "newest"
+
+        return filters
+
+    def _format_filter_phrase(self, filters: dict) -> str:
+        """Convert a filters dict back into a natural language phrase for re-search."""
+        parts = []
+        if "min_price" in filters:
+            parts.append(f"above {filters['min_price']:.0f}")
+        if "max_price" in filters:
+            parts.append(f"under {filters['max_price']:.0f}")
+        if filters.get("in_stock"):
+            parts.append("in stock")
+        if filters.get("sort") == "price_asc":
+            parts.append("cheapest")
+        elif filters.get("sort") == "price_desc":
+            parts.append("most expensive")
+        elif filters.get("sort") == "newest":
+            parts.append("newest")
+        return " ".join(parts)
+
+    def _format_product_search_card(
+        self, products: list, filters: dict = None, recommendations: list = None
+    ) -> str:
+        """Format product search results as a structured card string for the frontend."""
+        filters = filters or {}
+        recommendations = recommendations or []
+
+        filter_parts = []
+        if "min_price" in filters:
+            filter_parts.append(f"min_price={filters['min_price']:.0f}")
+        if "max_price" in filters:
+            filter_parts.append(f"max_price={filters['max_price']:.0f}")
+        if filters.get("in_stock"):
+            filter_parts.append("in_stock=true")
+        if "sort" in filters:
+            filter_parts.append(f"sort={filters['sort']}")
+        filters_str = ";".join(filter_parts) if filter_parts else "none"
+
+        def product_block(p):
+            price = p.get("unit_price", p.get("price", 0))
+            try:
+                price_fmt = f"{float(price):,.2f} ETB"
+            except (TypeError, ValueError):
+                price_fmt = str(price)
+            stock = p.get("current_stock", p.get("stock", 0))
+            image = p.get("thumbnail", p.get("image", "def.png"))
+            details = re.sub(r"<[^>]*>", "", str(p.get("description", p.get("details", "")))).strip()
+            return (
+                f"Product ID: {p.get('id', '')}\n"
+                f"Name: {p.get('name', '')}\n"
+                f"Price: {price_fmt}\n"
+                f"Stock: {stock}\n"
+                f"Image: {image}\n"
+                f"Details: {details[:200]}"
+            )
+
+        blocks = "\n---\n".join(product_block(p) for p in products)
+        card = f"PRODUCT SEARCH\nFilters: {filters_str}\n{blocks}"
+
+        if recommendations:
+            rec_blocks = "\n---\n".join(product_block(p) for p in recommendations)
+            card += f"\nRECOMMENDATIONS\n{rec_blocks}"
 
         return card
 

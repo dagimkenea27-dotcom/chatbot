@@ -164,7 +164,67 @@ body {
   height: 16px;
 }
 
-/* Messages */
+/* Language selector */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-selector {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #f4faf7;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 4px;
+}
+
+.lang-divider {
+  font-size: 11px;
+  color: var(--border);
+  line-height: 1;
+  user-select: none;
+}
+
+.lang-btn {
+  padding: 4px 9px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: all 0.18s ease;
+}
+
+.lang-btn.active {
+  background: linear-gradient(135deg, #047857, #10b981);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.lang-btn:not(.active):hover {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-dark);
+}
+
+/* Amharic font override */
+body.lang-am,
+body.lang-am .bubble,
+body.lang-am .qr-btn,
+body.lang-am .msg-input,
+body.lang-am .welcome-hero,
+body.lang-am .welcome-cta,
+body.lang-am .feature-item {
+  font-family: 'Noto Sans Ethiopic', 'DM Sans', system-ui, sans-serif;
+}
+
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;

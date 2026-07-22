@@ -4,6 +4,57 @@ const $ = id => document.getElementById(id);
 
 const PRODUCT_IMAGE_BASE = 'https://gojoshop.et/storage/product/thumbnail/';
 
+/* ==================================================================
+   i18n / Language Manager
+================================================================== */
+const i18n = {
+  _lang: localStorage.getItem('gojo_lang') || 'en',
+  _data: {},
+
+  get lang() { return this._lang; },
+
+  t(key, fallback) {
+    return this._data[key] ?? fallback ?? key;
+  },
+
+  async load(lang) {
+    try {
+      const res = await fetch(`/api/translations/${lang}`);
+      if (!res.ok) throw new Error('Translation not found');
+      this._data = await res.json();
+      this._lang = lang;
+      localStorage.setItem('gojo_lang', lang);
+    } catch (e) {
+      console.warn('Could not load translations for', lang, e);
+    }
+  },
+
+  applyToDOM() {
+    // Apply text translations
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      const val = this.t(key);
+      if (val && val !== key) el.textContent = val;
+    });
+    // Apply placeholder translations
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.dataset.i18nPlaceholder;
+      const val = this.t(key);
+      if (val && val !== key) el.placeholder = val;
+    });
+    // Apply title/aria translations
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const key = el.dataset.i18nTitle;
+      const val = this.t(key);
+      if (val && val !== key) el.title = val;
+    });
+    // Update html lang attribute
+    document.getElementById('htmlRoot').lang = this._lang === 'am' ? 'am' : 'en';
+    // Toggle Ethiopic font body class
+    document.body.classList.toggle('lang-am', this._lang === 'am');
+  }
+};
+
 function nowTime() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -133,7 +184,9 @@ function renderProductCards(products) {
   return products.map(p => {
     const isOutOfStock = parseInt(p.stock) <= 0;
     const stockClass = isOutOfStock ? 'stock-out' : 'stock-available';
-    const stockText = isOutOfStock ? 'Out of stock' : `${p.stock} in stock`;
+    const stockText = isOutOfStock
+      ? i18n.t('out_of_stock', 'Out of stock')
+      : i18n.t('in_stock_count', '{count} in stock').replace('{count}', p.stock);
     const imgUrl = resolveProductImage(p.image, p.name);
     const safeName = escHtml(p.name);
     const safeDetails = escHtml(p.details);
@@ -161,7 +214,7 @@ function renderProductCards(products) {
           ${desc}
           <span class="product-stock ${stockClass}"><span class="stock-dot"></span>${safeStockText}</span>
           <button class="add-cart-btn" data-product-name="${safeName}" onclick="addCartClicked(this, ${productId})" ${isOutOfStock ? 'disabled' : ''}>
-            ${isOutOfStock ? 'Sold Out' : cartIcon + ' Add'}
+            ${isOutOfStock ? i18n.t('sold_out','Sold Out') : cartIcon + ' ' + i18n.t('add_btn','Add')}
           </button>
         </div>
       </div>`;
@@ -169,14 +222,14 @@ function renderProductCards(products) {
 }
 
 function formatFilters(filters) {
-  if (!filters || filters === 'none') return 'No filters applied';
+  if (!filters || filters === 'none') return i18n.t('no_filters', 'No filters applied');
   return filters
-    .replace(/min_price=/g, 'Min ')
-    .replace(/max_price=/g, 'Max ')
-    .replace(/in_stock=true/g, 'In stock')
-    .replace(/sort=price_asc/g, 'Cheapest first')
-    .replace(/sort=price_desc/g, 'Highest price first')
-    .replace(/sort=newest/g, 'Newest first')
+    .replace(/min_price=/g, i18n.t('min_label','Min') + ' ')
+    .replace(/max_price=/g, i18n.t('max_label','Max') + ' ')
+    .replace(/in_stock=true/g, i18n.t('in_stock_label','In stock'))
+    .replace(/sort=price_asc/g, i18n.t('cheapest_first','Cheapest first'))
+    .replace(/sort=price_desc/g, i18n.t('highest_price_first','Highest price first'))
+    .replace(/sort=newest/g, i18n.t('newest_first','Newest first'))
     .replace(/;/g, ' · ');
 }
 
@@ -186,20 +239,24 @@ function renderProductGrid(data) {
   const cards = renderProductCards(products);
   const recCards = renderProductCards(recommendations);
   const count = products.length;
-  const label = count === 1 ? '1 product' : `${count} products`;
+  const prodWord = count === 1 ? i18n.t('product','product') : i18n.t('products','products');
+  const label = `${count} ${prodWord}`;
   const activeFilters = formatFilters(data.filters);
   const filterButtons = [
-    ['In stock', ' in stock'], ['Cheapest', ' cheapest'], ['Newest', ' newest'], ['Under 1000', ' under 1000'],
+    [i18n.t('in_stock_label','In stock'), ' in stock'],
+    [i18n.t('cheapest_first','Cheapest'), ' cheapest'],
+    [i18n.t('newest_first','Newest'), ' newest'],
+    ['Under 1000', ' under 1000'],
   ].map(([labelText, suffix]) =>
     `<button class="filter-btn" onclick="applyProductFilter('${suffix}')">${labelText}</button>`
   ).join('');
   const recSection = recommendations.length
-    ? `<div class="recommendation-section"><div class="recommendation-title">Recommended alternatives</div><div class="product-track">${recCards}</div></div>`
+    ? `<div class="recommendation-section"><div class="recommendation-title">${i18n.t('rec_alternatives','Recommended alternatives')}</div><div class="product-track">${recCards}</div></div>`
     : '';
   return `
     <div class="product-results">
       <div class="product-results-header">
-        <h3>Search Results</h3>
+        <h3>${i18n.t('search_results','Search Results')}</h3>
         <span class="product-count">${label}</span>
       </div>
       <div class="product-filter-bar">${filterButtons}</div>
@@ -240,17 +297,17 @@ function renderSupportCard(data) {
     <div class="support-card">
       ${intro}
       <div class="support-card-header">
-        <span class="support-badge">💬 Human Support</span>
+        <span class="support-badge">${i18n.t('human_support_badge','💬 Human Support')}</span>
         <span class="support-shop">${data.shop || 'GojoShop.et'}</span>
       </div>
       <div class="support-actions">
-        <a class="support-btn email" href="mailto:${email}">📧 Email us</a>
-        <a class="support-btn phone" href="tel:${phone}">📞 Call us</a>
+        <a class="support-btn email" href="mailto:${email}">${i18n.t('email_us_btn','📧 Email us')}</a>
+        <a class="support-btn phone" href="tel:${phone}">${i18n.t('call_us_btn','📞 Call us')}</a>
       </div>
       <div class="support-meta">
-        <div><strong>Email</strong><span>${email}</span></div>
-        <div><strong>Phone</strong><span>${data.phone || phone}</span></div>
-        <div><strong>Hours</strong><span>${data.hours || 'Mon–Sat, 9–6 EAT'}</span></div>
+        <div><strong>${i18n.t('email_label','Email')}</strong><span>${email}</span></div>
+        <div><strong>${i18n.t('phone_label','Phone')}</strong><span>${data.phone || phone}</span></div>
+        <div><strong>${i18n.t('hours_label','Hours')}</strong><span>${data.hours || 'Mon–Sat, 9–6 EAT'}</span></div>
       </div>
       ${data.note ? `<p class="support-note">${data.note}</p>` : ''}
     </div>`;
@@ -299,18 +356,18 @@ function renderOrderCard(data) {
   const itemRows = data.items.map(it => `<li><span>${it.name} × ${it.qty}</span><span>${it.price}</span></li>`).join('');
   return `
     <div class="order-card">
-      <div class="oc-row"><span class="oc-label">Order ID</span><span class="oc-val">${data.order_id || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Customer</span><span class="oc-val">${data.customer || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Placed</span><span class="oc-val">${data.placed || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('order_id_label','Order ID')}</span><span class="oc-val">${data.order_id || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('customer_label','Customer')}</span><span class="oc-val">${data.customer || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('placed_label','Placed')}</span><span class="oc-val">${data.placed || '—'}</span></div>
       <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">Status</span><span class="status-badge ${sc}">${se} ${data.status || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Tracking</span><span class="oc-val">${data.tracking || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Delivery</span><span class="oc-val">${data.address || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('status_label','Status')}</span><span class="status-badge ${sc}">${se} ${data.status || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('tracking_label','Tracking')}</span><span class="oc-val">${data.tracking || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('delivery_label','Delivery')}</span><span class="oc-val">${data.address || '—'}</span></div>
       <hr class="oc-divider"/>
       <ul class="oc-items-list">${itemRows}</ul>
       <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">Payment</span><span class="oc-val">${data.payment || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">Total</span><span class="oc-val oc-total">${data.total || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('payment_label','Payment')}</span><span class="oc-val">${data.payment || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('total_label','Total')}</span><span class="oc-val oc-total">${data.total || '—'}</span></div>
       ${data.statusMsg ? `<hr class="oc-divider"/><div style="font-size:12.5px;color:var(--text-muted)">${data.statusMsg}</div>` : ''}
     </div>`;
 }
@@ -340,11 +397,16 @@ const SupportPoller = {
     try {
       const res = await fetch(`/api/support/requests/active/${encodeURIComponent(userId)}`);
       const data = await res.json();
+      // Abort if we are no longer in support mode (e.g. turned off by send())
+      if (!chat._inSupportMode) {
+        this.stop();
+        return;
+      }
       if (data.status !== 'active') {
         // Support session ended by agent
         this.stop();
         chat._setSupportMode(false);
-        chat._appendBotWithDelay('✅ Support session has ended. How else can I help you?', 0, false);
+        chat._appendBotWithDelay(i18n.t('active_support_ended', '✅ Support session has ended. How else can I help you?'), 0, false);
         return;
       }
       this._requestId = data.request_id;
@@ -377,11 +439,29 @@ class GojoChat {
     this.lastProductQuery = localStorage.getItem('gojo_last_product_query') || '';
     this._inSupportMode = false;
     $('welcomeTs').textContent = nowTime();
+    this._initLang();
     this._bind();
     this._restoreAiState();
   }
 
   _genId() { return 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
+
+  async _initLang() {
+    const savedLang = i18n.lang;
+    await i18n.load(savedLang);
+    i18n.applyToDOM();
+    this._updateLangBtns(savedLang);
+  }
+
+  _updateLangBtns(lang) {
+    const enBtn = $('langBtnEn');
+    const amBtn = $('langBtnAm');
+    if (!enBtn || !amBtn) return;
+    enBtn.classList.toggle('active', lang === 'en');
+    enBtn.setAttribute('aria-pressed', String(lang === 'en'));
+    amBtn.classList.toggle('active', lang === 'am');
+    amBtn.setAttribute('aria-pressed', String(lang === 'am'));
+  }
 
   _bind() {
     this.sendBtn.addEventListener('click', () => this.send());
@@ -393,9 +473,18 @@ class GojoChat {
       await this._resetConversation();
     });
     $('exitSupportBtn').addEventListener('click', async () => {
-      // Send exit command through chat
       this.input.value = 'exit';
       await this.send();
+    });
+    // Language selector buttons
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const lang = btn.dataset.lang;
+        await i18n.load(lang);
+        i18n.applyToDOM();
+        this._updateLangBtns(lang);
+        this._setSupportMode(this._inSupportMode); // re-apply placeholders
+      });
     });
   }
 
@@ -416,7 +505,8 @@ class GojoChat {
   }
 
   async _resetConversation() {
-    this.messages.innerHTML = '<div class="date-sep">Today</div>';
+    const todayLabel = i18n.t('date_sep_today', 'Today');
+    this.messages.innerHTML = `<div class="date-sep">${todayLabel}</div>`;
     this._setSupportMode(false);
     try {
       await fetch('/api/session/reset', {
@@ -426,7 +516,7 @@ class GojoChat {
       });
     } catch (_) {}
     this._setSupportMode(false);
-    await this._appendBotWithDelay('Chat cleared! How can I help you today? 😊', 600, false);
+    await this._appendBotWithDelay(i18n.t('chat_cleared_msg', 'Chat cleared! How can I help you today? 😊'), 600, false);
   }
 
   _setSupportMode(on) {
@@ -437,18 +527,25 @@ class GojoChat {
     if (on) {
       banner.classList.add('active');
       quickReplies.style.display = 'none';
-      input.placeholder = 'Type a message to the support agent...';
+      input.placeholder = i18n.t('input_placeholder_support', 'Type a message to the support agent...');
     } else {
       banner.classList.remove('active');
       SupportPoller.stop();
       quickReplies.style.display = '';
-      input.placeholder = 'Search products, track orders, ask anything...';
+      input.placeholder = i18n.t('input_placeholder', 'Search products, track orders, ask anything...');
     }
   }
 
   async send() {
     const msg = this.input.value.trim();
     if (!msg) return;
+
+    // Immediately leave support mode if exit command is sent, preventing race conditions with the poller
+    const msgLower = msg.toLowerCase();
+    if (this._inSupportMode && (msgLower === 'exit' || msgLower === 'reset' || msgLower === 'stop support')) {
+      this._setSupportMode(false);
+    }
+
     this._appendUser(msg);
     this.input.value = '';
     this.input.focus();
@@ -459,7 +556,7 @@ class GojoChat {
       const res  = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: this.userId, message: msg })
+        body: JSON.stringify({ user_id: this.userId, message: msg, lang: i18n.lang })
       });
       const data = await res.json();
 
@@ -493,7 +590,7 @@ class GojoChat {
       await this._appendBotWithDelay(data.response, 0, true);
     } catch (err) {
       this._setTyping(false);
-      await this._appendBotWithDelay('⚠️ Connection error. Please try again.', 500, false);
+      await this._appendBotWithDelay(i18n.t('connection_error', '⚠️ Connection error. Please try again.'), 500, false);
     } finally {
       this.sendBtn.disabled = false;
     }
@@ -525,7 +622,7 @@ class GojoChat {
     row.innerHTML = `
       <div class="bot-icon">👤</div>
       <div class="bot-content">
-        <div class="agent-label">Support Agent</div>
+        <div class="agent-label">${i18n.t('support_agent_label','Support Agent')}</div>
         <div class="bubble">${this._esc(text)}</div>
         <div class="ts">${nowTime()}</div>
       </div>`;
@@ -613,7 +710,7 @@ window.addCartClicked = async (btn, id) => {
   const name = btn.dataset.productName || 'this item';
   btn.disabled = true;
   const originalHtml = btn.innerHTML;
-  btn.innerHTML = 'Adding…';
+  btn.innerHTML = i18n.t('cart_adding', 'Adding…');
   try {
     const res = await fetch('/api/cart/add', {
       method: 'POST',
@@ -621,15 +718,16 @@ window.addCartClicked = async (btn, id) => {
       body: JSON.stringify({ user_id: window.gojoChatInstance.userId, product: name })
     });
     if (res.ok) {
-      btn.innerHTML = '✓ Added';
+      btn.innerHTML = i18n.t('cart_added', '✓ Added');
       btn.style.background = 'var(--green)';
       setTimeout(() => {
-        window.gojoChatInstance.appendLocalBotMessage(`🛒 Added **${name}** to your cart! Type \`checkout\` when you're ready.`);
+        const cartMsg = i18n.t('cart_added_msg', '🛒 Added **{product}** to your cart! Type `checkout` when you\'re ready.').replace('{product}', name);
+        window.gojoChatInstance.appendLocalBotMessage(cartMsg);
       }, 300);
     } else { throw new Error('Failed'); }
   } catch (err) {
     console.error(err);
-    btn.innerHTML = 'Failed'; btn.style.background = 'var(--red)';
+    btn.innerHTML = i18n.t('cart_failed', 'Failed'); btn.style.background = 'var(--red)';
     setTimeout(() => { btn.innerHTML = originalHtml; btn.style.background = ''; btn.disabled = false; }, 1500);
   }
 };

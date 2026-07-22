@@ -12,7 +12,14 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
-CORS(app)
+
+# Configure CORS dynamically from .env
+cors_origins = os.getenv('CORS_ORIGIN', '*')
+if cors_origins == '*' or not cors_origins.strip():
+    CORS(app)
+else:
+    origins_list = [o.strip() for o in cors_origins.split(',') if o.strip()]
+    CORS(app, origins=origins_list)
 
 # Initialize chatbot — inject DB manager
 chatbot = GojoShopChatbot(db_manager=db)
@@ -41,6 +48,7 @@ def chat():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     message = (data.get('message') or '').strip()
+    lang = data.get('lang')
 
     if not user_id:
         user_id = str(uuid.uuid4())
@@ -48,7 +56,13 @@ def chat():
     if not message:
         return jsonify({'error': 'Message is required'}), 400
 
+    chatbot._ensure_session(user_id)
+    if lang:
+        chatbot.user_sessions[user_id]["language"] = lang
+
     response = chatbot.get_response(user_id, message)
+    current_lang = chatbot.user_sessions[user_id].get('language', 'en')
+
     if response == "[SUPPORT_MODE]":
         return jsonify({
             'user_id': user_id,
@@ -56,7 +70,8 @@ def chat():
             'intent': 'human_support',
             'typing_delay_ms': 0,
             'needs_human': True,
-            'in_support_mode': True
+            'in_support_mode': True,
+            'lang': current_lang
         })
 
     delay = chatbot.calc_typing_delay(response)
@@ -67,13 +82,22 @@ def chat():
         'intent': chatbot.user_sessions[user_id]['current_intent'],
         'typing_delay_ms': delay,
         'needs_human': chatbot.user_sessions[user_id].get('human_support_requested', False),
+        'lang': current_lang
     })
+
+
+@app.route('/api/translations/<lang>', methods=['GET'])
+def get_translations(lang):
+    """Retrieve UI translations for frontend consumption."""
+    if lang not in chatbot.translations:
+        return jsonify({'error': 'Language not supported'}), 404
+    return jsonify(chatbot.translations.get(lang, {}).get("ui", {}))
 
 
 @app.route('/api/support/requests', methods=['GET'])
 def list_support_requests():
     """List pending human-support requests (for admin/staff use)."""
-    return jsonify({'requests': chatbot.support_requests[-50:]})
+    return jsonify({'requests': chatbot.list_support_requests(50)})
 
 
 @app.route('/api/support/request', methods=['POST'])
@@ -249,7 +273,27 @@ def health():
 
 
 if __name__ == '__main__':
+    host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
-    print(f"[GojoShop] Chatbot running on http://localhost:{port}")
-    app.run(debug=debug, port=port)
+    
+    # Dynamically find the primary local IP address to print nice instructions
+    local_ip = '127.0.0.1'
+    if host == '0.0.0.0':
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            local_ip = s.getsockname()[0]
+        except Exception:
+            local_ip = '127.0.0.1'
+        finally:
+            s.close()
+
+    print(f"[GojoShop] Chatbot starting...")
+    print(f"  - Local:           http://127.0.0.1:{port}")
+    if host == '0.0.0.0' and local_ip != '127.0.0.1':
+        print(f"  - Local Network:   http://{local_ip}:{port}")
+    
+    app.run(host=host, debug=debug, port=port)
+

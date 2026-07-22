@@ -131,5 +131,80 @@ class TestGojoShopChatbot(unittest.TestCase):
             self.assertNotIn("â€”", content)
             self.assertNotIn("ðŸ", content)
 
+    def test_db_session_and_support_persistence(self):
+        class FullPersistentDB(FakeDB):
+            def __init__(self):
+                self.sessions = {}
+                self.support_reqs = {}
+
+            def get_user_session(self, user_id):
+                return self.sessions.get(user_id)
+
+            def save_user_session(self, user_id, data):
+                self.sessions[user_id] = data
+                return True
+
+            def delete_user_session(self, user_id):
+                self.sessions.pop(user_id, None)
+                return True
+
+            def create_support_request(self, request_id, user_id, message, metadata):
+                req = {
+                    "id": request_id,
+                    "status": "open",
+                    "user_id": user_id,
+                    "message": message,
+                    "metadata": metadata,
+                    "messages": [{"sender": "user", "text": message}]
+                }
+                self.support_reqs[request_id] = req
+                return req
+
+            def get_active_support_request(self, user_id):
+                for req in self.support_reqs.values():
+                    if req["user_id"] == user_id and req["status"] in ("open", "in_progress"):
+                        return req
+                return None
+
+            def add_support_message(self, request_id, sender, text):
+                req = self.support_reqs.get(request_id)
+                if req:
+                    msg = {"sender": sender, "text": text}
+                    req["messages"].append(msg)
+                    return msg
+                return None
+
+            def list_support_requests(self, limit=50):
+                return list(self.support_reqs.values())[-limit:]
+
+            def update_support_request_status(self, request_id, status):
+                req = self.support_reqs.get(request_id)
+                if req:
+                    req["status"] = status
+                    return req
+                return None
+
+        pdb = FullPersistentDB()
+        chatbot = GojoShopChatbot(db_manager=pdb)
+        user = "persistent_user_456"
+
+        # 1. Test Session persistence
+        chatbot.get_response(user, "Hello")
+        self.assertIn(user, pdb.sessions)
+
+        # 2. Test Support request DB persistence
+        res = chatbot.get_response(user, "Talk to human")
+        self.assertIn("HUMAN SUPPORT", res)
+        active = chatbot.get_active_support_request(user)
+        self.assertIsNotNone(active)
+        self.assertEqual(active["user_id"], user)
+
+        # 3. Test list and update support requests
+        reqs = chatbot.list_support_requests()
+        self.assertEqual(len(reqs), 1)
+
+        updated = chatbot.update_support_request_status(active["id"], "resolved")
+        self.assertEqual(updated["status"], "resolved")
+
 if __name__ == '__main__':
     unittest.main()

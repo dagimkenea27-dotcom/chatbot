@@ -11,10 +11,46 @@ import pymysql.cursors
 from dotenv import load_dotenv
 import os
 import logging
+from queue import Queue, Empty
+import threading
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+class PyMySQLConnectionPool:
+    def __init__(self, pool_size=10, **config):
+        self.config = config
+        self.pool_size = pool_size
+        self.pool = Queue(maxsize=pool_size)
+        self.lock = threading.Lock()
+        self._created_connections = 0
+
+    def _create_connection(self):
+        return pymysql.connect(**self.config)
+
+    def get_connection(self):
+        try:
+            return self.pool.get_nowait()
+        except Empty:
+            with self.lock:
+                if self._created_connections < self.pool_size:
+                    self._created_connections += 1
+                    return self._create_connection()
+            return self.pool.get(block=True, timeout=5)
+
+    def release_connection(self, conn):
+        try:
+            conn.ping(reconnect=True)
+            self.pool.put_nowait(conn)
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            with self.lock:
+                self._created_connections -= 1
 
 
 class DatabaseManager:
@@ -29,10 +65,21 @@ class DatabaseManager:
             "cursorclass": pymysql.cursors.DictCursor,
             "connect_timeout": 5,
         }
+        self._pool = PyMySQLConnectionPool(pool_size=15, **self.config)
 
     def _get_connection(self):
-        """Open a fresh connection (short-lived, safe for Flask threading)."""
-        return pymysql.connect(**self.config)
+        """Lease a connection from the connection pool (thread-safe)."""
+        conn = self._pool.get_connection()
+        original_close = conn.close
+        
+        def release_to_pool():
+            # Restore the original close method and release back to pool
+            conn.close = original_close
+            self._pool.release_connection(conn)
+            
+        conn.close = release_to_pool
+        return conn
+
 
     def health_check(self) -> bool:
         """Returns True if DB is reachable."""
@@ -430,6 +477,211 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"clear_cart error: {e}")
             return False
+
+    def get_user_session(self, user_id: str) -> dict | None:
+        """Fetch session data from database."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT session_data FROM user_sessions WHERE user_id = %s", (user_id,))
+                row = cur.fetchone()
+            conn.close()
+            if row and row["session_data"]:
+                if isinstance(row["session_data"], str):
+                    import json
+                    return json.loads(row["session_data"])
+                return row["session_data"]
+            return None
+        except Exception as e:
+            logger.error(f"get_user_session error: {e}")
+            return None
+
+    def save_user_session(self, user_id: str, session_data: dict) -> bool:
+        """Save session data to database."""
+        try:
+            import json
+            serialized = json.dumps(session_data)
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO user_sessions (user_id, session_data) "
+                    "VALUES (%s, %s) ON DUPLICATE KEY UPDATE session_data = %s",
+                    (user_id, serialized, serialized)
+                )
+                conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"save_user_session error: {e}")
+            return False
+
+    def delete_user_session(self, user_id: str) -> bool:
+        """Delete session data from database."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+                conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"delete_user_session error: {e}")
+            return False
+
+    def get_active_support_request(self, user_id: str) -> dict | None:
+        """Fetch current active support request for user."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM support_requests WHERE user_id = %s AND status IN ('open', 'in_progress') "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    (user_id,)
+                )
+                row = cur.fetchone()
+            conn.close()
+            if row:
+                import json
+                if row.get("messages") and isinstance(row["messages"], str):
+                    row["messages"] = json.loads(row["messages"])
+                if row.get("metadata") and isinstance(row["metadata"], str):
+                    row["metadata"] = json.loads(row["metadata"])
+                return row
+            return None
+        except Exception as e:
+            logger.error(f"get_active_support_request error: {e}")
+            return None
+
+    def create_support_request(self, request_id: str, user_id: str, message: str, metadata: dict) -> dict | None:
+        """Create a new support request in database."""
+        try:
+            import json
+            from datetime import datetime
+            
+            initial_msg = {
+                "sender": "user",
+                "text": message,
+                "timestamp": datetime.now().isoformat()
+            }
+            messages_json = json.dumps([initial_msg])
+            metadata_json = json.dumps(metadata)
+            
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO support_requests (id, status, user_id, message, metadata, messages) "
+                    "VALUES (%s, 'open', %s, %s, %s, %s)",
+                    (request_id, user_id, message, metadata_json, messages_json)
+                )
+                conn.commit()
+            conn.close()
+            
+            return {
+                "id": request_id,
+                "status": "open",
+                "user_id": user_id,
+                "message": message,
+                "metadata": metadata,
+                "messages": [initial_msg],
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"create_support_request error: {e}")
+            return None
+
+    def add_support_message(self, request_id: str, sender: str, text: str) -> dict | None:
+        """Add a message to a support request's chat history."""
+        try:
+            import json
+            from datetime import datetime
+            
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT messages FROM support_requests WHERE id = %s", (request_id,))
+                row = cur.fetchone()
+                if not row:
+                    conn.close()
+                    return None
+                
+                messages = []
+                if row["messages"]:
+                    if isinstance(row["messages"], str):
+                        messages = json.loads(row["messages"])
+                    elif isinstance(row["messages"], list):
+                        messages = row["messages"]
+                
+                new_msg = {
+                    "sender": sender,
+                    "text": text,
+                    "timestamp": datetime.now().isoformat()
+                }
+                messages.append(new_msg)
+                
+                cur.execute(
+                    "UPDATE support_requests SET messages = %s WHERE id = %s",
+                    (json.dumps(messages), request_id)
+                )
+                conn.commit()
+            conn.close()
+            return new_msg
+        except Exception as e:
+            logger.error(f"add_support_message error: {e}")
+            return None
+
+    def list_support_requests(self, limit: int = 50) -> list[dict]:
+        """List the last N support requests."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM support_requests ORDER BY created_at DESC LIMIT %s",
+                    (limit,)
+                )
+                rows = cur.fetchall()
+            conn.close()
+            
+            import json
+            for row in rows:
+                if row.get("messages") and isinstance(row["messages"], str):
+                    row["messages"] = json.loads(row["messages"])
+                if row.get("metadata") and isinstance(row["metadata"], str):
+                    row["metadata"] = json.loads(row["metadata"])
+                if row.get("created_at"):
+                    # Format datetime objects as strings for JSON API
+                    row["timestamp"] = row["created_at"].isoformat()
+            return rows
+        except Exception as e:
+            logger.error(f"list_support_requests error: {e}")
+            return []
+
+    def update_support_request_status(self, request_id: str, status: str) -> dict | None:
+        """Update status of a support request."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE support_requests SET status = %s WHERE id = %s",
+                    (status, request_id)
+                )
+                conn.commit()
+                
+                cur.execute("SELECT * FROM support_requests WHERE id = %s LIMIT 1", (request_id,))
+                row = cur.fetchone()
+            conn.close()
+            
+            if row:
+                import json
+                if row.get("messages") and isinstance(row["messages"], str):
+                    row["messages"] = json.loads(row["messages"])
+                if row.get("metadata") and isinstance(row["metadata"], str):
+                    row["metadata"] = json.loads(row["metadata"])
+                if row.get("created_at"):
+                    row["timestamp"] = row["created_at"].isoformat()
+                return row
+            return None
+        except Exception as e:
+            logger.error(f"update_support_request_status error: {e}")
+            return None
 
     @staticmethod
     def _normalise_order_id(raw) -> str:

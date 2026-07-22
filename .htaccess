@@ -1,0 +1,25 @@
+# GojoShop Chatbot — Web Server Configuration (.htaccess)
+# Designed for Apache & LiteSpeed Web Server hosting (e.g. chat.gojotech.et)
+
+# -------------------------------------------------------------
+# Option 1: cPanel / LiteSpeed Python App (Phusion Passenger)
+# -------------------------------------------------------------
+<IfModule mod_passenger.c>
+    PassengerEnabled On
+    PassengerAppType wsgi
+    PassengerStartupFile passenger_wsgi.py
+</IfModule>
+
+# -------------------------------------------------------------
+# Option 2: Apache Reverse Proxy to background Python server
+# (Uncomment if running `python app.py` or `gunicorn` on port 5000)
+# -------------------------------------------------------------
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{REQUEST_FILENAME} !-f
+#     RewriteCond %{REQUEST_FILENAME} !-d
+#     RewriteRule ^(.*)$ http://127.0.0.1:5000/$1 [P,L]
+# </IfModule>
+
+# Prevent directory browsing
+Options -Indexes

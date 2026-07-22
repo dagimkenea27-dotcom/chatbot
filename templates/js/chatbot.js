@@ -340,6 +340,11 @@ const SupportPoller = {
     try {
       const res = await fetch(`/api/support/requests/active/${encodeURIComponent(userId)}`);
       const data = await res.json();
+      // Abort if we are no longer in support mode (e.g. turned off by send())
+      if (!chat._inSupportMode) {
+        this.stop();
+        return;
+      }
       if (data.status !== 'active') {
         // Support session ended by agent
         this.stop();
@@ -449,6 +454,13 @@ class GojoChat {
   async send() {
     const msg = this.input.value.trim();
     if (!msg) return;
+
+    // Immediately leave support mode if exit command is sent, preventing race conditions with the poller
+    const msgLower = msg.toLowerCase();
+    if (this._inSupportMode && (msgLower === 'exit' || msgLower === 'reset' || msgLower === 'stop support')) {
+      this._setSupportMode(false);
+    }
+
     this._appendUser(msg);
     this.input.value = '';
     this.input.focus();
