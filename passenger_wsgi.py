@@ -1,8 +1,10 @@
 import sys
 import os
 
-# Add application root directory to python path
-sys.path.insert(0, os.path.dirname(__file__))
+# Set working directory & Python path to application directory
+app_dir = os.path.dirname(__file__)
+sys.path.insert(0, app_dir)
+os.chdir(app_dir)
 
 # Expose application callable for Phusion Passenger / cPanel / LiteSpeed
 from app import app as application

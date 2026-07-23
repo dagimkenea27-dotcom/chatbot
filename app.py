@@ -33,7 +33,10 @@ else:
 
 @app.route('/')
 def index():
-    return render_template('chatbot.html')
+    try:
+        return render_template('index.html')
+    except Exception:
+        return render_template('chatbot.html')
 
 
 @app.route('/admin/support')
