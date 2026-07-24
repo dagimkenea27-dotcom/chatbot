@@ -57,7 +57,7 @@ class DatabaseManager:
     def __init__(self):
         self.config = {
             "host":     os.getenv("DB_HOST", "localhost"),
-            "port":     int(os.getenv("DB_PORT", 3306)),
+            "port":     int(os.getenv("DB_PORT")) if os.getenv("DB_PORT", "").strip().isdigit() else 3306,
             "user":     os.getenv("DB_USER", "root"),
             "password": os.getenv("DB_PASSWORD", ""),
             "db":       os.getenv("DB_NAME", "gojoshopchat"),

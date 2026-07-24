@@ -277,7 +277,7 @@ def health():
 
 if __name__ == '__main__':
     host = os.getenv('FLASK_HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT')) if os.getenv('PORT', '').strip().isdigit() else 5000
     debug = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
     
     # Dynamically find the primary local IP address to print nice instructions
