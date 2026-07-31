@@ -93,16 +93,60 @@ class DatabaseManager:
 
     def get_order(self, order_id: str) -> dict | None:
         """
-        Fetch a single order by order_id (e.g. 'ORD-1001').
-        Returns a dict with order fields, or None if not found / DB down.
+        Fetch a single order by order_id, JOINed with the users table so
+        customer name / email / phone are always populated from the real DB.
+        Returns a dict with order + customer fields, or None if not found.
         """
-        # Normalise: accept '1001', '#1001', '' → 'ORD-1001'
         order_id = self._normalise_order_id(order_id)
         try:
             conn = self._get_connection()
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM orders WHERE id = %s LIMIT 1",
+                    """
+                    SELECT
+                        o.id,
+                        o.customer_id,
+                        o.order_status,
+                        o.order_amount,
+                        o.payment_method,
+                        o.payment_status,
+                        o.transaction_ref,
+                        o.shipping_address,
+                        o.shipping_address_data,
+                        o.shipping_cost,
+                        o.is_shipping_free,
+                        o.shipping_type,
+                        o.delivery_type,
+                        o.delivery_service_name,
+                        o.third_party_delivery_tracking_id AS tracking_number,
+                        o.expected_delivery_date,
+                        o.order_note,
+                        o.seller_is,
+                        o.cancel_reason,
+                        o.cancel_cause,
+                        o.canceled_by_type,
+                        o.customer_phone        AS order_phone,
+                        o.coupon_code,
+                        o.discount_amount,
+                        o.extra_discount,
+                        o.shipping_cost,
+                        o.deliveryman_charge,
+                        o.order_group_id,
+                        o.created_at,
+                        o.updated_at,
+                        -- Customer fields from users table
+                        COALESCE(u.name,
+                                 CONCAT_WS(' ', NULLIF(u.f_name,''), NULLIF(u.l_name,'')),
+                                 'N/A')              AS customer_name,
+                        COALESCE(u.phone, o.customer_phone, 'N/A') AS customer_phone,
+                        COALESCE(u.email, 'N/A')    AS customer_email
+                    FROM orders o
+                    LEFT JOIN users u
+                        ON CONVERT(CAST(u.id AS CHAR) USING utf8mb4) COLLATE utf8mb4_general_ci
+                         = CONVERT(o.customer_id USING utf8mb4) COLLATE utf8mb4_general_ci
+                    WHERE o.id = %s
+                    LIMIT 1
+                    """,
                     (order_id,)
                 )
                 row = cur.fetchone()
@@ -114,16 +158,38 @@ class DatabaseManager:
 
     def get_order_items(self, order_id: str) -> list[dict]:
         """
-        Fetch all items belonging to an order.
-        Returns a list of dicts, or [] on failure.
+        Fetch all items belonging to an order from order_details.
+        Extracts product name from the product_details JSON blob.
+        Returns a list of dicts with all useful fields, or [] on failure.
         """
         order_id = self._normalise_order_id(order_id)
         try:
             conn = self._get_connection()
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT JSON_UNQUOTE(JSON_EXTRACT(product_details, '$.name')) AS product_name, qty AS quantity, price AS unit_price "
-                    "FROM order_details WHERE order_id = %s",
+                    """
+                    SELECT
+                        od.id,
+                        od.product_id,
+                        COALESCE(
+                            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(od.product_details, '$.name')), 'null'),
+                            'Unknown Product'
+                        )                           AS product_name,
+                        JSON_UNQUOTE(JSON_EXTRACT(od.product_details, '$.thumbnail')) AS thumbnail,
+                        od.qty                      AS quantity,
+                        od.price                    AS unit_price,
+                        od.discount,
+                        od.tax,
+                        od.tax_model,
+                        od.variant,
+                        od.variation,
+                        od.discount_type,
+                        od.delivery_status,
+                        od.payment_status,
+                        od.refund_request
+                    FROM order_details od
+                    WHERE od.order_id = %s
+                    """,
                     (order_id,)
                 )
                 rows = cur.fetchall()

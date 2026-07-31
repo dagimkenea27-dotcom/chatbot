@@ -1,7 +1,7 @@
 # telegram_bot.py
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from chatbot_service import GojoShopChatbot
+from chatbot import GojoShopChatbot
 from dotenv import load_dotenv
 import os
 

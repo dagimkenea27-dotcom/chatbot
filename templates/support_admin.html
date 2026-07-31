@@ -50,6 +50,23 @@
       background: linear-gradient(135deg, #1a1d26, #22263a);
     }
 
+    .back-to-chat {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11.5px; font-weight: 600; color: var(--text-s);
+      text-decoration: none;
+      padding: 5px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface3);
+      margin-bottom: 14px;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .back-to-chat:hover {
+      color: var(--accent);
+      background: rgba(16,185,129,0.08);
+      border-color: var(--accent);
+    }
+    .back-to-chat svg { width: 13px; height: 13px; flex-shrink: 0; }
+
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
     .brand-dot {
       width: 34px; height: 34px;
@@ -277,6 +294,10 @@
   <!-- ── LEFT: Ticket Sidebar ── -->
   <aside class="sidebar">
     <div class="sidebar-header">
+      <a href="/" class="back-to-chat" title="Go back to chatbot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Chat
+      </a>
       <div class="brand">
         <div class="brand-dot">G</div>
         <div>

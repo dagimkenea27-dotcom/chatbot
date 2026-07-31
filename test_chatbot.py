@@ -1,7 +1,7 @@
 # test_chatbot.py
 import unittest
 from pathlib import Path
-from chatbot_service import GojoShopChatbot
+from chatbot.chatbot_core import GojoShopChatbot
 
 
 class FakeDB:

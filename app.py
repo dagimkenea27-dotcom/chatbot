@@ -1,7 +1,7 @@
 # app.py
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from chatbot_service import GojoShopChatbot
+from chatbot.chatbot_core import GojoShopChatbot
 from database import db
 from dotenv import load_dotenv
 import uuid
@@ -37,6 +37,11 @@ def index():
         return render_template('index.html')
     except Exception:
         return render_template('chatbot.html')
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 
 @app.route('/admin/support')

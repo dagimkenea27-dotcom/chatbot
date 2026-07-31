@@ -36,11 +36,11 @@ function parseProductCard(text) {
         const t = line.trim();
         if (!t || t.startsWith('Filters:') || t.includes('PRODUCT SEARCH')) continue;
         if (t.startsWith('Product ID:')) { prod.id = t.replace('Product ID:', '').trim(); continue; }
-        if (t.startsWith('Name:'))       { prod.name = t.replace('Name:', '').trim(); continue; }
-        if (t.startsWith('Price:'))      { prod.price = t.replace('Price:', '').trim(); continue; }
-        if (t.startsWith('Stock:'))      { prod.stock = t.replace('Stock:', '').trim(); continue; }
-        if (t.startsWith('Image:'))      { prod.image = t.replace('Image:', '').trim(); continue; }
-        if (t.startsWith('Details:'))    { prod.details = t.replace('Details:', '').trim(); continue; }
+        if (t.startsWith('Name:')) { prod.name = t.replace('Name:', '').trim(); continue; }
+        if (t.startsWith('Price:')) { prod.price = t.replace('Price:', '').trim(); continue; }
+        if (t.startsWith('Stock:')) { prod.stock = t.replace('Stock:', '').trim(); continue; }
+        if (t.startsWith('Image:')) { prod.image = t.replace('Image:', '').trim(); continue; }
+        if (t.startsWith('Details:')) { prod.details = t.replace('Details:', '').trim(); continue; }
       }
       if (prod.id && prod.name) parsed.push(prod);
     }
@@ -62,20 +62,20 @@ function getProductImage(name) {
     if (nameLower.includes(kw)) { foundKeyword = kw; break; }
   }
   const images = {
-    toy:      'https://images.unsplash.com/photo-1559251606-c623743a6d76?auto=format&fit=crop&w=400&q=80',
-    bear:     'https://images.unsplash.com/photo-1582060047814-1237a2f2a75d?auto=format&fit=crop&w=400&q=80',
-    monkey:   'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=400&q=80',
-    hippo:    'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&w=400&q=80',
-    earring:  'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80',
-    bag:      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
+    toy: 'https://images.unsplash.com/photo-1559251606-c623743a6d76?auto=format&fit=crop&w=400&q=80',
+    bear: 'https://images.unsplash.com/photo-1582060047814-1237a2f2a75d?auto=format&fit=crop&w=400&q=80',
+    monkey: 'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=400&q=80',
+    hippo: 'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&w=400&q=80',
+    earring: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80',
+    bag: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
     backpack: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=400&q=80',
-    purse:    'https://images.unsplash.com/photo-1566150905458-1bf1fc15a7a5?auto=format&fit=crop&w=400&q=80',
-    shoe:     'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
-    dress:    'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&q=80',
-    shirt:    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    towel:    'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80',
-    coaster:  'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
-    product:  'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80'
+    purse: 'https://images.unsplash.com/photo-1566150905458-1bf1fc15a7a5?auto=format&fit=crop&w=400&q=80',
+    shoe: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
+    dress: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&q=80',
+    shirt: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
+    towel: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80',
+    coaster: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
+    product: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80'
   };
   return images[foundKeyword];
 }
@@ -183,11 +183,11 @@ function parseSupportCard(text) {
 
   for (const line of lines) {
     const t = line.trim();
-    if (t.startsWith('Shop:'))   data.shop   = t.replace('Shop:', '').trim();
-    if (t.startsWith('Email:'))  data.email  = t.replace('Email:', '').trim();
-    if (t.startsWith('Phone:'))  data.phone  = t.replace('Phone:', '').trim();
-    if (t.startsWith('Hours:'))  data.hours  = t.replace('Hours:', '').trim();
-    if (t.startsWith('Note:'))   data.note   = t.replace('Note:', '').trim();
+    if (t.startsWith('Shop:')) data.shop = t.replace('Shop:', '').trim();
+    if (t.startsWith('Email:')) data.email = t.replace('Email:', '').trim();
+    if (t.startsWith('Phone:')) data.phone = t.replace('Phone:', '').trim();
+    if (t.startsWith('Hours:')) data.hours = t.replace('Hours:', '').trim();
+    if (t.startsWith('Note:')) data.note = t.replace('Note:', '').trim();
   }
   return data;
 }
@@ -223,14 +223,14 @@ function isOrderCard(text) {
 }
 
 const STATUS_CLASS = {
-  DELIVERED:  'status-delivered',
-  SHIPPED:    'status-shipped',
+  DELIVERED: 'status-delivered',
+  SHIPPED: 'status-shipped',
   PROCESSING: 'status-processing',
-  PENDING:    'status-pending',
-  CANCELLED:  'status-cancelled',
+  PENDING: 'status-pending',
+  CANCELLED: 'status-cancelled',
 };
 const STATUS_EMOJI = {
-  DELIVERED:'✅', SHIPPED:'🚚', PROCESSING:'⚙️', PENDING:'🕒', CANCELLED:'✖️'
+  DELIVERED: '✅', SHIPPED: '🚚', PROCESSING: '⚙️', PENDING: '🕒', CANCELLED: '✖️'
 };
 
 function parseOrderCard(text) {
@@ -242,15 +242,15 @@ function parseOrderCard(text) {
   for (const line of lines) {
     const t = line.trim();
     if (!t) continue;
-    if (t.startsWith('🧾 Order:'))       { data.order_id   = t.replace('🧾 Order:', '').trim(); continue; }
-    if (t.startsWith('👤'))             { data.customer   = t.replace('👤','').trim(); continue; }
-    if (t.startsWith('🗓️ Placed:'))     { data.placed     = t.replace('🗓️ Placed:','').trim(); continue; }
-    if (t.startsWith('Status:'))       { data.status     = t.replace(/Status:.*?(\w+)$/,'$1').trim().toUpperCase(); continue; }
-    if (t.startsWith('Tracking:'))     { data.tracking   = t.replace('Tracking:','').trim(); continue; }
-    if (t.startsWith('Delivery to:'))  { data.address    = t.replace('Delivery to:','').trim(); continue; }
-    if (t.startsWith('🛍️ Items:'))      { inItems = true;  continue; }
-    if (t.startsWith('💳 Payment:'))   { inItems = false; data.payment = t.replace('💳 Payment:','').trim(); continue; }
-    if (t.startsWith('💰 Total:'))     { data.total      = t.replace('💰 Total:','').trim(); continue; }
+    if (t.startsWith('🧾 Order:')) { data.order_id = t.replace('🧾 Order:', '').trim(); continue; }
+    if (t.startsWith('👤')) { data.customer = t.replace('👤', '').trim(); continue; }
+    if (t.startsWith('🗓️ Placed:')) { data.placed = t.replace('🗓️ Placed:', '').trim(); continue; }
+    if (t.startsWith('Status:')) { data.status = t.replace(/Status:.*?(\w+)$/, '$1').trim().toUpperCase(); continue; }
+    if (t.startsWith('Tracking:')) { data.tracking = t.replace('Tracking:', '').trim(); continue; }
+    if (t.startsWith('Delivery to:')) { data.address = t.replace('Delivery to:', '').trim(); continue; }
+    if (t.startsWith('🛍️ Items:')) { inItems = true; continue; }
+    if (t.startsWith('💳 Payment:')) { inItems = false; data.payment = t.replace('💳 Payment:', '').trim(); continue; }
+    if (t.startsWith('💰 Total:')) { data.total = t.replace('💰 Total:', '').trim(); continue; }
     if (inItems && t.startsWith('•')) {
       const m = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+)/);
       if (m) items.push({ name: m[1], qty: m[2], price: m[3] });
@@ -290,13 +290,13 @@ function renderOrderCard(data) {
 /* Chat client */
 class GojoChat {
   constructor() {
-    this.userId   = localStorage.getItem('gojo_uid') || this._genId();
+    this.userId = localStorage.getItem('gojo_uid') || this._genId();
     localStorage.setItem('gojo_uid', this.userId);
 
-    this.input    = $('msgInput');
-    this.sendBtn  = $('sendBtn');
+    this.input = $('msgInput');
+    this.sendBtn = $('sendBtn');
     this.messages = $('chatMessages');
-    this.typing   = $('typingRow');
+    this.typing = $('typingRow');
     this.lastProductQuery = localStorage.getItem('gojo_last_product_query') || '';
 
     $('welcomeTs').textContent = nowTime();
@@ -322,7 +322,7 @@ class GojoChat {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: this.userId })
         });
-      } catch (_) {}
+      } catch (_) { }
       await this._appendBotWithDelay('Chat cleared! How can I help you today? 😊', 600, false);
     });
   }
@@ -340,7 +340,7 @@ class GojoChat {
     const started = Date.now();
 
     try {
-      const res  = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: this.userId, message: msg })
@@ -459,7 +459,7 @@ class GojoChat {
   }
 
   _esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   _fmt(text) {

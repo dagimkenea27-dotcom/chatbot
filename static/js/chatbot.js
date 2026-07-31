@@ -87,11 +87,11 @@ function parseProductCard(text) {
         const t = line.trim();
         if (!t || t.startsWith('Filters:') || t.includes('PRODUCT SEARCH')) continue;
         if (t.startsWith('Product ID:')) { prod.id = t.replace('Product ID:', '').trim(); continue; }
-        if (t.startsWith('Name:'))       { prod.name = t.replace('Name:', '').trim(); continue; }
-        if (t.startsWith('Price:'))      { prod.price = t.replace('Price:', '').trim(); continue; }
-        if (t.startsWith('Stock:'))      { prod.stock = t.replace('Stock:', '').trim(); continue; }
-        if (t.startsWith('Image:'))      { prod.image = t.replace('Image:', '').trim(); continue; }
-        if (t.startsWith('Details:'))    { prod.details = t.replace('Details:', '').trim(); continue; }
+        if (t.startsWith('Name:')) { prod.name = t.replace('Name:', '').trim(); continue; }
+        if (t.startsWith('Price:')) { prod.price = t.replace('Price:', '').trim(); continue; }
+        if (t.startsWith('Stock:')) { prod.stock = t.replace('Stock:', '').trim(); continue; }
+        if (t.startsWith('Image:')) { prod.image = t.replace('Image:', '').trim(); continue; }
+        if (t.startsWith('Details:')) { prod.details = t.replace('Details:', '').trim(); continue; }
       }
       if (prod.id && prod.name) parsed.push(prod);
     }
@@ -113,20 +113,20 @@ function getProductImage(name) {
     if (nameLower.includes(kw)) { foundKeyword = kw; break; }
   }
   const images = {
-    toy:      'https://images.unsplash.com/photo-1559251606-c623743a6d76?auto=format&fit=crop&w=400&q=80',
-    bear:     'https://images.unsplash.com/photo-1582060047814-1237a2f2a75d?auto=format&fit=crop&w=400&q=80',
-    monkey:   'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=400&q=80',
-    hippo:    'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&w=400&q=80',
-    earring:  'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80',
-    bag:      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
+    toy: 'https://images.unsplash.com/photo-1559251606-c623743a6d76?auto=format&fit=crop&w=400&q=80',
+    bear: 'https://images.unsplash.com/photo-1582060047814-1237a2f2a75d?auto=format&fit=crop&w=400&q=80',
+    monkey: 'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=400&q=80',
+    hippo: 'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&w=400&q=80',
+    earring: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80',
+    bag: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
     backpack: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=400&q=80',
-    purse:    'https://images.unsplash.com/photo-1566150905458-1bf1fc15a7a5?auto=format&fit=crop&w=400&q=80',
-    shoe:     'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
-    dress:    'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&q=80',
-    shirt:    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    towel:    'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80',
-    coaster:  'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
-    product:  'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80'
+    purse: 'https://images.unsplash.com/photo-1566150905458-1bf1fc15a7a5?auto=format&fit=crop&w=400&q=80',
+    shoe: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
+    dress: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&q=80',
+    shirt: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
+    towel: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80',
+    coaster: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
+    product: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80'
   };
   return images[foundKeyword];
 }
@@ -214,7 +214,7 @@ function renderProductCards(products) {
           ${desc}
           <span class="product-stock ${stockClass}"><span class="stock-dot"></span>${safeStockText}</span>
           <button class="add-cart-btn" data-product-name="${safeName}" onclick="addCartClicked(this, ${productId})" ${isOutOfStock ? 'disabled' : ''}>
-            ${isOutOfStock ? i18n.t('sold_out','Sold Out') : cartIcon + ' ' + i18n.t('add_btn','Add')}
+            ${isOutOfStock ? i18n.t('sold_out', 'Sold Out') : cartIcon + ' ' + i18n.t('add_btn', 'Add')}
           </button>
         </div>
       </div>`;
@@ -224,12 +224,12 @@ function renderProductCards(products) {
 function formatFilters(filters) {
   if (!filters || filters === 'none') return i18n.t('no_filters', 'No filters applied');
   return filters
-    .replace(/min_price=/g, i18n.t('min_label','Min') + ' ')
-    .replace(/max_price=/g, i18n.t('max_label','Max') + ' ')
-    .replace(/in_stock=true/g, i18n.t('in_stock_label','In stock'))
-    .replace(/sort=price_asc/g, i18n.t('cheapest_first','Cheapest first'))
-    .replace(/sort=price_desc/g, i18n.t('highest_price_first','Highest price first'))
-    .replace(/sort=newest/g, i18n.t('newest_first','Newest first'))
+    .replace(/min_price=/g, i18n.t('min_label', 'Min') + ' ')
+    .replace(/max_price=/g, i18n.t('max_label', 'Max') + ' ')
+    .replace(/in_stock=true/g, i18n.t('in_stock_label', 'In stock'))
+    .replace(/sort=price_asc/g, i18n.t('cheapest_first', 'Cheapest first'))
+    .replace(/sort=price_desc/g, i18n.t('highest_price_first', 'Highest price first'))
+    .replace(/sort=newest/g, i18n.t('newest_first', 'Newest first'))
     .replace(/;/g, ' · ');
 }
 
@@ -239,24 +239,24 @@ function renderProductGrid(data) {
   const cards = renderProductCards(products);
   const recCards = renderProductCards(recommendations);
   const count = products.length;
-  const prodWord = count === 1 ? i18n.t('product','product') : i18n.t('products','products');
+  const prodWord = count === 1 ? i18n.t('product', 'product') : i18n.t('products', 'products');
   const label = `${count} ${prodWord}`;
   const activeFilters = formatFilters(data.filters);
   const filterButtons = [
-    [i18n.t('in_stock_label','In stock'), ' in stock'],
-    [i18n.t('cheapest_first','Cheapest'), ' cheapest'],
-    [i18n.t('newest_first','Newest'), ' newest'],
+    [i18n.t('in_stock_label', 'In stock'), ' in stock'],
+    [i18n.t('cheapest_first', 'Cheapest'), ' cheapest'],
+    [i18n.t('newest_first', 'Newest'), ' newest'],
     ['Under 1000', ' under 1000'],
   ].map(([labelText, suffix]) =>
     `<button class="filter-btn" onclick="applyProductFilter('${suffix}')">${labelText}</button>`
   ).join('');
   const recSection = recommendations.length
-    ? `<div class="recommendation-section"><div class="recommendation-title">${i18n.t('rec_alternatives','Recommended alternatives')}</div><div class="product-track">${recCards}</div></div>`
+    ? `<div class="recommendation-section"><div class="recommendation-title">${i18n.t('rec_alternatives', 'Recommended alternatives')}</div><div class="product-track">${recCards}</div></div>`
     : '';
   return `
     <div class="product-results">
       <div class="product-results-header">
-        <h3>${i18n.t('search_results','Search Results')}</h3>
+        <h3>${i18n.t('search_results', 'Search Results')}</h3>
         <span class="product-count">${label}</span>
       </div>
       <div class="product-filter-bar">${filterButtons}</div>
@@ -278,11 +278,11 @@ function parseSupportCard(text) {
   if (parts[0]) data.intro = parts[0].trim();
   for (const line of lines) {
     const t = line.trim();
-    if (t.startsWith('Shop:'))  data.shop  = t.replace('Shop:', '').trim();
+    if (t.startsWith('Shop:')) data.shop = t.replace('Shop:', '').trim();
     if (t.startsWith('Email:')) data.email = t.replace('Email:', '').trim();
     if (t.startsWith('Phone:')) data.phone = t.replace('Phone:', '').trim();
     if (t.startsWith('Hours:')) data.hours = t.replace('Hours:', '').trim();
-    if (t.startsWith('Note:'))  data.note  = t.replace('Note:', '').trim();
+    if (t.startsWith('Note:')) data.note = t.replace('Note:', '').trim();
   }
   return data;
 }
@@ -292,22 +292,22 @@ function renderSupportCard(data) {
     ? `<p class="support-intro">${data.intro.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</p>`
     : '';
   const email = data.email || 'support@gojoshop.et';
-  const phone = (data.phone || '+251911234567').replace(/\s/g, '');
+  const phone = (data.phone || '+251988664488').replace(/\s/g, '');
   return `
     <div class="support-card">
       ${intro}
       <div class="support-card-header">
-        <span class="support-badge">${i18n.t('human_support_badge','💬 Human Support')}</span>
+        <span class="support-badge">${i18n.t('human_support_badge', '💬 Human Support')}</span>
         <span class="support-shop">${data.shop || 'GojoShop.et'}</span>
       </div>
       <div class="support-actions">
-        <a class="support-btn email" href="mailto:${email}">${i18n.t('email_us_btn','📧 Email us')}</a>
-        <a class="support-btn phone" href="tel:${phone}">${i18n.t('call_us_btn','📞 Call us')}</a>
+        <a class="support-btn email" href="mailto:${email}">${i18n.t('email_us_btn', '📧 Email us')}</a>
+        <a class="support-btn phone" href="tel:${phone}">${i18n.t('call_us_btn', '📞 Call us')}</a>
       </div>
       <div class="support-meta">
-        <div><strong>${i18n.t('email_label','Email')}</strong><span>${email}</span></div>
-        <div><strong>${i18n.t('phone_label','Phone')}</strong><span>${data.phone || phone}</span></div>
-        <div><strong>${i18n.t('hours_label','Hours')}</strong><span>${data.hours || 'Mon–Sat, 9–6 EAT'}</span></div>
+        <div><strong>${i18n.t('email_label', 'Email')}</strong><span>${email}</span></div>
+        <div><strong>${i18n.t('phone_label', 'Phone')}</strong><span>${data.phone || phone}</span></div>
+        <div><strong>${i18n.t('hours_label', 'Hours')}</strong><span>${data.hours || 'Mon–Sat, 9–6 EAT'}</span></div>
       </div>
       ${data.note ? `<p class="support-note">${data.note}</p>` : ''}
     </div>`;
@@ -322,7 +322,7 @@ const STATUS_CLASS = {
   PROCESSING: 'status-processing', PENDING: 'status-pending', CANCELLED: 'status-cancelled',
 };
 const STATUS_EMOJI = {
-  DELIVERED:'✅', SHIPPED:'🚚', PROCESSING:'⚙️', PENDING:'🕒', CANCELLED:'✖️'
+  DELIVERED: '✅', SHIPPED: '🚚', PROCESSING: '⚙️', PENDING: '🕒', CANCELLED: '✖️'
 };
 
 function parseOrderCard(text) {
@@ -331,46 +331,116 @@ function parseOrderCard(text) {
   for (const line of lines) {
     const t = line.trim();
     if (!t) continue;
-    if (t.startsWith('🧾 Order:'))      { data.order_id = t.replace('🧾 Order:', '').trim(); continue; }
-    if (t.startsWith('👤'))            { data.customer  = t.replace('👤', '').trim(); continue; }
-    if (t.startsWith('🗓️ Placed:'))    { data.placed    = t.replace('🗓️ Placed:', '').trim(); continue; }
-    if (t.startsWith('Status:'))       { data.status    = t.replace(/Status:.*?(\w+)$/, '$1').trim().toUpperCase(); continue; }
-    if (t.startsWith('Tracking:'))     { data.tracking  = t.replace('Tracking:', '').trim(); continue; }
-    if (t.startsWith('Delivery to:'))  { data.address   = t.replace('Delivery to:', '').trim(); continue; }
-    if (t.startsWith('🛍️ Items:'))     { inItems = true; continue; }
-    if (t.startsWith('💳 Payment:'))   { inItems = false; data.payment = t.replace('💳 Payment:', '').trim(); continue; }
-    if (t.startsWith('💰 Total:'))     { data.total = t.replace('💰 Total:', '').trim(); continue; }
-    if (inItems && t.startsWith('•')) {
-      const m = t.match(/•\s(.+?)\s×\s(\d+)\s+—\s+(.+)/);
-      if (m) items.push({ name: m[1], qty: m[2], price: m[3] }); continue;
+
+    // ── Order header ──────────────────────────────────────────
+    if (t.startsWith('📦')) { data.order_id = t.replace(/^📦\s*Order\s*#?/i, '').trim(); continue; }
+    if (t.startsWith('🗂️')) { data.group = t.replace(/^🗂️\s*Group\s*:/i, '').trim(); continue; }
+
+    // ── Customer block ─────────────────────────────────────────
+    if (t.startsWith('👤')) { data.customer = t.replace(/^👤\s*Customer\s*:/i, '').trim(); continue; }
+    if (t.startsWith('📱')) { data.phone = t.replace(/^📱\s*Phone\s*:/i, '').trim(); continue; }
+    if (t.startsWith('📧')) { data.email = t.replace(/^📧\s*Email\s*:/i, '').trim(); continue; }
+
+    // ── Timestamps ─────────────────────────────────────────────
+    if (t.startsWith('📅')) { data.placed = t.replace(/^📅\s*Placed\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🔄')) { data.updated = t.replace(/^🔄\s*Updated\s*:/i, '').trim(); continue; }
+
+    // ── Delivery block ─────────────────────────────────────────
+    if (/^[📦🕐⚙️🚚✅❌]\s*Status\s*:/i.test(t)) {
+      const m = t.match(/Status\s*:\s*(.+)/i);
+      data.status = m ? m[1].trim().toUpperCase() : '';
+      continue;
     }
-    if (!t.startsWith('•') && !inItems && data.total) data.statusMsg = t;
+    if (t.startsWith('🚚') && t.includes('Tracking')) { data.tracking = t.replace(/^🚚\s*Tracking\s*:/i, '').trim(); continue; }
+    if (t.startsWith('📆')) { data.expected = t.replace(/^📆\s*Expected\s*:/i, '').trim(); continue; }
+    if (t.startsWith('📍')) { data.delivery = t.replace(/^📍\s*Delivery\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🏠')) { data.address = t.replace(/^🏠\s*Address\s*:/i, '').trim(); continue; }
+    if (t.startsWith('📝')) { data.note = t.replace(/^📝\s*Note\s*:/i, '').trim(); continue; }
+
+    // ── Items block ────────────────────────────────────────────
+    if (t.startsWith('🛍️')) { inItems = true; continue; }
+    if (inItems && t.startsWith('•')) {
+      const m = t.match(/•\s+(.+?)\s+×\s+(\d+)\s+—\s+([^\s]+\s*ETB)/);
+      if (m) {
+        const rest = t.slice(m[0].length).trim();
+        const variant = (rest.match(/\[([^\]]+)\]/) || [])[1] || '';
+        items.push({ name: m[1], qty: m[2], price: m[3], variant });
+      }
+      continue;
+    }
+    if (inItems && !t.startsWith('•')) inItems = false;
+
+    // ── Payment block ──────────────────────────────────────────
+    if (t.startsWith('💳')) { data.payment = t.replace(/^💳\s*Payment\s*:/i, '').trim(); inItems = false; continue; }
+    if (t.startsWith('🔢')) { data.tx_ref = t.replace(/^🔢\s*Tx Ref\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🏷️') && t.includes('Coupon')) { data.coupon = t.replace(/^🏷️\s*Coupon\s*:/i, '').trim(); continue; }
+    if (t.startsWith('💸')) { data.discount = t.replace(/^💸\s*Discount\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🚚') && t.includes('Shipping')) { data.shipping = t.replace(/^🚚\s*Shipping\s*:/i, '').trim(); continue; }
+    if (t.startsWith('💰')) { data.total = t.replace(/^💰\s*Total\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🏢')) { data.seller = t.replace(/^🏢\s*Seller\s*:/i, '').trim(); continue; }
+
+    // ── Cancellation block ─────────────────────────────────────
+    if (t.startsWith('❌') && t.includes('Reason')) { data.cancel_reason = t.replace(/^❌\s*Reason\s*:/i, '').trim(); continue; }
+    if (t.startsWith('🔍')) { data.cancel_cause = t.replace(/^🔍\s*Cause ID\s*:/i, '').trim(); continue; }
+    if (t.startsWith('👁️')) { data.canceled_by = t.replace(/^👁️\s*Cancelled by\s*:/i, '').trim(); continue; }
+
+    // Status footer message (non-prefixed trailing text)
+    if (!inItems && data.total && !t.startsWith('•')) data.statusMsg = t;
   }
   data.items = items;
   return data;
 }
 
 function renderOrderCard(data) {
-  const sc = STATUS_CLASS[data.status] || 'status-pending';
-  const se = STATUS_EMOJI[data.status] || '📦';
-  const itemRows = data.items.map(it => `<li><span>${it.name} × ${it.qty}</span><span>${it.price}</span></li>`).join('');
+  const rawStatus = (data.status || '').toUpperCase().replace('CANCELED', 'CANCELLED');
+  const sc = STATUS_CLASS[rawStatus] || 'status-pending';
+  const se = STATUS_EMOJI[rawStatus] || '📦';
+
+  const itemRows = data.items.map(it => {
+    const variant = it.variant ? `<span class="oc-item-variant">${escHtml(it.variant)}</span>` : '';
+    return `<li><span>${escHtml(it.name)} × ${escHtml(it.qty)}${variant}</span><span>${escHtml(it.price)}</span></li>`;
+  }).join('') || `<li class="oc-no-items">${i18n.t('no_items', 'No items found.')}</li>`;
+
+  const cancelBlock = data.cancel_reason
+    ? `<hr class="oc-divider"/>
+       <div class="oc-row"><span class="oc-label">❌ ${i18n.t('cancel_reason_label', 'Reason')}</span><span class="oc-val oc-cancel">${escHtml(data.cancel_reason)}</span></div>
+       ${data.cancel_cause ? `<div class="oc-row"><span class="oc-label">🔍 ${i18n.t('cancel_cause_label', 'Cause ID')}</span><span class="oc-val">${escHtml(data.cancel_cause)}</span></div>` : ''}
+       ${data.canceled_by ? `<div class="oc-row"><span class="oc-label">👁️ ${i18n.t('canceled_by_label', 'By')}</span><span class="oc-val">${escHtml(data.canceled_by)}</span></div>` : ''}`
+    : '';
+
   return `
     <div class="order-card">
-      <div class="oc-row"><span class="oc-label">${i18n.t('order_id_label','Order ID')}</span><span class="oc-val">${data.order_id || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">${i18n.t('customer_label','Customer')}</span><span class="oc-val">${data.customer || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">${i18n.t('placed_label','Placed')}</span><span class="oc-val">${data.placed || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('order_id_label', 'Order ID')}</span><span class="oc-val oc-id">#${escHtml(data.order_id || '—')}</span></div>
+      ${data.group ? `<div class="oc-row"><span class="oc-label">${i18n.t('order_group_label', 'Group')}</span><span class="oc-val oc-muted">${escHtml(data.group)}</span></div>` : ''}
       <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">${i18n.t('status_label','Status')}</span><span class="status-badge ${sc}">${se} ${data.status || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">${i18n.t('tracking_label','Tracking')}</span><span class="oc-val">${data.tracking || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">${i18n.t('delivery_label','Delivery')}</span><span class="oc-val">${data.address || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('customer_label', 'Customer')}</span><span class="oc-val"><strong>${escHtml(data.customer || '—')}</strong></span></div>
+      ${data.phone ? `<div class="oc-row"><span class="oc-label">📱 ${i18n.t('phone_label', 'Phone')}</span><span class="oc-val">${escHtml(data.phone)}</span></div>` : ''}
+      ${data.email ? `<div class="oc-row"><span class="oc-label">📧 ${i18n.t('email_label', 'Email')}</span><span class="oc-val">${escHtml(data.email)}</span></div>` : ''}
+      <hr class="oc-divider"/>
+      <div class="oc-row"><span class="oc-label">${i18n.t('placed_label', 'Placed')}</span><span class="oc-val">${escHtml(data.placed || '—')}</span></div>
+      ${data.updated ? `<div class="oc-row"><span class="oc-label">${i18n.t('updated_label', 'Updated')}</span><span class="oc-val">${escHtml(data.updated)}</span></div>` : ''}
+      <hr class="oc-divider"/>
+      <div class="oc-row"><span class="oc-label">${i18n.t('status_label', 'Status')}</span><span class="status-badge ${sc}">${se} ${rawStatus || '—'}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('tracking_label', 'Tracking')}</span><span class="oc-val">${escHtml(data.tracking || '—')}</span></div>
+      ${data.expected ? `<div class="oc-row"><span class="oc-label">${i18n.t('expected_label', 'Expected')}</span><span class="oc-val">${escHtml(data.expected)}</span></div>` : ''}
+      ${data.delivery ? `<div class="oc-row"><span class="oc-label">${i18n.t('delivery_type_label', 'Delivery')}</span><span class="oc-val">${escHtml(data.delivery)}</span></div>` : ''}
+      <div class="oc-row"><span class="oc-label">${i18n.t('delivery_label', 'Address')}</span><span class="oc-val">${escHtml(data.address || '—')}</span></div>
+      ${data.note && data.note !== '—' ? `<div class="oc-row"><span class="oc-label">${i18n.t('note_label', 'Note')}</span><span class="oc-val oc-muted">${escHtml(data.note)}</span></div>` : ''}
       <hr class="oc-divider"/>
       <ul class="oc-items-list">${itemRows}</ul>
       <hr class="oc-divider"/>
-      <div class="oc-row"><span class="oc-label">${i18n.t('payment_label','Payment')}</span><span class="oc-val">${data.payment || '—'}</span></div>
-      <div class="oc-row"><span class="oc-label">${i18n.t('total_label','Total')}</span><span class="oc-val oc-total">${data.total || '—'}</span></div>
-      ${data.statusMsg ? `<hr class="oc-divider"/><div style="font-size:12.5px;color:var(--text-muted)">${data.statusMsg}</div>` : ''}
+      <div class="oc-row"><span class="oc-label">${i18n.t('payment_label', 'Payment')}</span><span class="oc-val">${escHtml(data.payment || '—')}</span></div>
+      ${data.tx_ref && data.tx_ref !== 'N/A' ? `<div class="oc-row"><span class="oc-label">${i18n.t('tx_ref_label', 'Tx Ref')}</span><span class="oc-val oc-muted">${escHtml(data.tx_ref)}</span></div>` : ''}
+      ${data.coupon && data.coupon !== '—' ? `<div class="oc-row"><span class="oc-label">🏷️ ${i18n.t('coupon_label', 'Coupon')}</span><span class="oc-val">${escHtml(data.coupon)}</span></div>` : ''}
+      ${data.discount ? `<div class="oc-row"><span class="oc-label">💸 ${i18n.t('discount_label', 'Discount')}</span><span class="oc-val">${escHtml(data.discount)}</span></div>` : ''}
+      <div class="oc-row"><span class="oc-label">🚚 ${i18n.t('shipping_label', 'Shipping')}</span><span class="oc-val">${escHtml(data.shipping || '—')}</span></div>
+      <div class="oc-row"><span class="oc-label">${i18n.t('total_label', 'Total')}</span><span class="oc-val oc-total">${escHtml(data.total || '—')}</span></div>
+      ${data.seller && data.seller !== 'N/A' ? `<div class="oc-row"><span class="oc-label">🏢 ${i18n.t('seller_label', 'Seller')}</span><span class="oc-val oc-muted">${escHtml(data.seller)}</span></div>` : ''}
+      ${cancelBlock}
+      ${data.statusMsg ? `<hr class="oc-divider"/><div class="oc-status-msg">${escHtml(data.statusMsg)}</div>` : ''}
     </div>`;
 }
+
 
 /* ==================================================================
    Live Support Polling
@@ -430,12 +500,12 @@ const SupportPoller = {
 ================================================================== */
 class GojoChat {
   constructor() {
-    this.userId   = localStorage.getItem('gojo_uid') || this._genId();
+    this.userId = localStorage.getItem('gojo_uid') || this._genId();
     localStorage.setItem('gojo_uid', this.userId);
-    this.input    = $('msgInput');
-    this.sendBtn  = $('sendBtn');
+    this.input = $('msgInput');
+    this.sendBtn = $('sendBtn');
     this.messages = $('chatMessages');
-    this.typing   = $('typingRow');
+    this.typing = $('typingRow');
     this.lastProductQuery = localStorage.getItem('gojo_last_product_query') || '';
     this._inSupportMode = false;
     $('welcomeTs').textContent = nowTime();
@@ -500,7 +570,7 @@ class GojoChat {
           body: JSON.stringify({ user_id: this.userId })
         });
       }
-    } catch (_) {}
+    } catch (_) { }
     this._setSupportMode(false);
   }
 
@@ -514,7 +584,7 @@ class GojoChat {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: this.userId })
       });
-    } catch (_) {}
+    } catch (_) { }
     this._setSupportMode(false);
     await this._appendBotWithDelay(i18n.t('chat_cleared_msg', 'Chat cleared! How can I help you today? 😊'), 600, false);
   }
@@ -553,7 +623,7 @@ class GojoChat {
     this.sendBtn.disabled = true;
     const started = Date.now();
     try {
-      const res  = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: this.userId, message: msg, lang: i18n.lang })
@@ -622,7 +692,7 @@ class GojoChat {
     row.innerHTML = `
       <div class="bot-icon">👤</div>
       <div class="bot-content">
-        <div class="agent-label">${i18n.t('support_agent_label','Support Agent')}</div>
+        <div class="agent-label">${i18n.t('support_agent_label', 'Support Agent')}</div>
         <div class="bubble">${this._esc(text)}</div>
         <div class="ts">${nowTime()}</div>
       </div>`;
@@ -688,7 +758,7 @@ class GojoChat {
     requestAnimationFrame(() => { this.messages.scrollTop = this.messages.scrollHeight; });
   }
 
-  _esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  _esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   _fmt(text) {
     return this._esc(text)
