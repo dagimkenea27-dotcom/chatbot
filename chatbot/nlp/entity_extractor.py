@@ -31,7 +31,7 @@ class EntityExtractor:
         if order_match:
             entities["order_id"] = order_match.group(1)
         else:
-            if any(w in message_lower for w in ["order", "track", "ትዕዛዝ"]):
+            if any(w in message_lower for w in ["order", "track", "ትዕዛዝ", "ትእዛዜ", "ትዕዛዜ", "ትእዛዝ"]):
                 num_match = re.search(r'\b(\d{4,})\b', message)
                 if num_match:
                     entities["order_id"] = num_match.group(1)
@@ -39,7 +39,7 @@ class EntityExtractor:
         # Extract price filters
         price_match = re.search(r'(under|below|less than|max|over|above|more than|min)\s*(\d+)', message_lower)
         if price_match:
-            if not any(w in message_lower for w in ["order", "track", "ትዕዛዝ"]):
+            if not any(w in message_lower for w in ["order", "track", "ትዕዛዝ","ትእዛዜ", "ትዕዛዜ", "ትእዛዝ"]):
                 entities["price_filter"] = {
                     "operator": price_match.group(1),
                     "value": int(price_match.group(2))
@@ -65,23 +65,42 @@ class EntityExtractor:
         message_lower = message.lower().strip()
         
         non_product_phrases = [
+            # Order / support topics (never product searches)
             "track my order", "track order", "my order", "order status", "order number",
             "shipping", "delivery", "payment", "contact", "hours", "help", "support",
             "return policy", "warranty", "cancel order", "cancellation", "human support",
-            "ትዕዛዜ", "ትዕዛዝ", "ትእዛዜ", "ትእዛዝ"
+            "ትዕዛዜ", "ትዕዛዝ", "ትእዛዜ", "ትእዛዝ", "tizaze", "tizaz", "huneta",
+            # Greetings / small talk
+            "how are you", "how's it going", "how is it going", "how's your day",
+            "what's up", "what's new", "good morning", "good afternoon",
+            "good evening", "thanks", "thank you", "thank you very much",
+            "እንደምን", "ሰላም", "አመሰግናለሁ", "እንደምን አደርክ",
+            # Questions about the bot / site
+            "who are you", "what is your name", "what's your name", "what can you do",
+            "are you a robot", "are you a bot", "what is sami", "who is sami",
+            "how do you work", "where are you",
+            # Miscellaneous non-product queries
+            "hello", "hi there", "bye", "see you", "exit", "reset", "stop",
         ]
         if any(phrase in message_lower for phrase in non_product_phrases):
             return None
         
         filler = [
-            r"^(show me|search for|find|i'm looking for|looking for|i want to buy|want to buy|i want|i need to buy|need to buy|do you have|"
-            r"can i get|i need|buy|get me|what about|tell me about|ፈልግ|አሳይ|እፈልጋለሁ|ግዛ)\s+",
-            r"\s+(please|pls|now|today|asap)$",
+            r"^(show me|show|search for|search|find|looking for|i'm looking for|"
+            r"i want to buy|want to buy|i want to get|i would like|i'd like|would like|"
+            r"i want|want to buy|i need to buy|need to buy|do you have|can i get|"
+            r"i need|need|buy|get me|recommend|tell me about|what about|show me some|"
+            r"ፈልግ|አሳይ|እፈልጋለሁ|ግዛ|መግዛት|felge|asay|efeligalehu|giza|megzat|mayet)\s+",
+            r"\s+(please|pls|now|today|asap|right now)$",
             r"\b(a|an|the|some|any)\b\s*",
         ]
         kw = message_lower
         for pat in filler:
             kw = re.sub(pat, "", kw, flags=re.IGNORECASE).strip()
+        
+        # A leftover bare question word ("what", "how", ...) is not a product.
+        if re.match(r"^(what|what's|who|when|where|why|how|can|could|do|does)\b", kw):
+            return None
         
         kw = re.sub(
             r"\b(under|below|above|over|max|min|cheaper than|more than|less than|"
@@ -160,14 +179,41 @@ class EntityExtractor:
         """Categorize a search keyword."""
         keyword_lower = keyword.lower()
         categories = {
-            "electronics": ["phone", "laptop", "tablet", "camera", "tv", "computer", "speaker", "headphone"],
-            "clothing": ["shirt", "dress", "jeans", "jacket", "suit", "skirt", "top", "ልብስ"],
-            "shoes": ["shoe", "boot", "sneaker", "sandal", "heel"],
-            "bags": ["bag", "handbag", "purse", "backpack", "wallet", "ቦርሳ"],
-            "accessories": ["earring", "necklace", "bracelet", "ring", "watch", "belt"],
-            "home": ["sofa", "table", "chair", "bed", "furniture", "decor", "vase", "lamp", "rug"],
-            "toys": ["teddy", "bear", "toy", "doll", "game", "አሻንጉሊት"],
-            "kitchen": ["cookware", "utensil", "appliance", "pot", "pan", "knife"],
+            "electronics": [
+                "phone", "iphone", "samsung", "galaxy", "pixel", "laptop", "macbook",
+                "tablet", "ipad", "camera", "tv", "computer", "speaker", "headphone",
+                "airpods", "charger", "ቴሊፎን", "ኮምፒውተር", "ላፕቶፕ",
+                "telifon", "kompyuter", "laptop", "kamera",
+            ],
+            "clothing": [
+                "shirt", "dress", "jeans", "jacket", "suit", "skirt", "top", "trousers",
+                "pants", "ልብስ", "ሸሚዝ", "ቀሚስ", "ሱሪ", "libs", "shemiz", "kemis", "suri",
+            ],
+            "shoes": [
+                "shoe", "boot", "sneaker", "sandal", "heel", "slipper", "ጫማ", "ብስኬት",
+                "chama", "sneaker",
+            ],
+            "bags": [
+                "bag", "handbag", "purse", "backpack", "wallet", "ቦርሳ", "ቻንታ",
+                "borsa", "chanta",
+            ],
+            "accessories": [
+                "earring", "necklace", "bracelet", "ring", "watch", "belt", "sunglasses",
+                "የጆሮ", "ሀብል", "ቀለበት", "ክሎች", "earring", "habl", "kelebet", "se'at",
+            ],
+            "home": [
+                "sofa", "table", "chair", "bed", "furniture", "decor", "vase", "lamp",
+                "rug", "curtain", "ቤት", "ሶፋ", "ጠረጴዛ", "ወንበር", "አልጋ", "sofa", "tesrepiza",
+                "wonber", "alga",
+            ],
+            "toys": [
+                "teddy", "bear", "toy", "doll", "game", "puzzle", "አሻንጉሊት", "ሀብታም",
+                "ashangulit",
+            ],
+            "kitchen": [
+                "cookware", "utensil", "appliance", "pot", "pan", "knife", "kettle",
+                "blender", "ኩሽና", "ፓን", "knife", "kitchen",
+            ],
         }
         for category, keywords in categories.items():
             if any(kw in keyword_lower for kw in keywords):

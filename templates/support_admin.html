@@ -5,33 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GojoShop.et — Support Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0f1117;
-      --surface:  #1a1d26;
-      --surface2: #22263a;
-      --surface3: #2c3048;
-      --border:   rgba(255,255,255,0.07);
+      --bg:       #f0fdf8;
+      --surface:  #ffffff;
+      --surface2: #f4faf7;
+      --surface3: #e6faf1;
+      --border:   rgba(4, 120, 87, 0.12);
+      --border-hover: rgba(16, 185, 129, 0.45);
       --accent:   #10b981;
       --accent-d: #047857;
-      --blue:     #3b82f6;
+      --accent-light: #059669;
+      --accent-glow: rgba(16, 185, 129, 0.12);
+      --blue:     #2563eb;
       --blue-d:   #1d4ed8;
-      --text:     #e8ecf4;
-      --text-s:   #9aa3b8;
-      --red:      #ef4444;
-      --orange:   #f59e0b;
-      --green:    #22c55e;
-      --radius:   12px;
-      --radius-sm: 8px;
+      --text:     #134e3a;
+      --text-s:   #6b8f7a;
+      --red:      #dc2626;
+      --orange:   #d97706;
+      --green:    #16a34a;
+      --radius:   16px;
+      --radius-sm: 10px;
+      --shadow: 0 20px 50px rgba(4, 120, 87, 0.12), 0 4px 16px rgba(0, 0, 0, 0.06);
     }
 
-    html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    html, body { height: 100%; font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    body {
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(16, 185, 129, 0.14) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 50% at 95% 100%, rgba(4, 120, 87, 0.10) 0%, transparent 50%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+    }
 
     /* ── Layout ── */
-    .layout { display: flex; height: 100vh; overflow: hidden; }
+    .layout { display: flex; height: 100%; overflow: hidden; }
 
     /* ── Left Panel: Ticket List ── */
     .sidebar {
@@ -47,7 +58,7 @@
     .sidebar-header {
       padding: 20px;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(135deg, #1a1d26, #22263a);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fffb 100%);
     }
 
     .back-to-chat {
@@ -115,7 +126,7 @@
       position: relative;
     }
     .ticket-item:hover { background: var(--surface2); }
-    .ticket-item.selected { background: var(--surface2); border-left: 3px solid var(--blue); }
+    .ticket-item.selected { background: var(--surface2); border-left: 3px solid var(--accent); }
 
     .ticket-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
     .ticket-id { font-size: 11px; font-weight: 700; color: var(--text-s); }
@@ -181,7 +192,7 @@
 
     .chat-avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--blue-d), var(--blue));
+      background: linear-gradient(145deg, var(--accent-d), var(--accent));
       display: flex; align-items: center; justify-content: center;
       font-size: 16px; flex-shrink: 0;
     }
@@ -197,10 +208,10 @@
       padding: 6px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
       border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
     }
-    .btn-start    { background: rgba(59,130,246,0.12); color: var(--blue);   border-color: rgba(59,130,246,0.3); }
+    .btn-start    { background: rgba(16,185,129,0.12); color: var(--accent-d); border-color: rgba(16,185,129,0.3); }
     .btn-resolve  { background: rgba(34,197,94,0.12);  color: var(--green);  border-color: rgba(34,197,94,0.3); }
     .btn-reopen   { background: rgba(245,158,11,0.12); color: var(--orange); border-color: rgba(245,158,11,0.3); }
-    .btn-start:hover   { background: var(--blue-d); color: #fff; border-color: var(--blue-d); }
+    .btn-start:hover   { background: var(--accent-d); color: #fff; border-color: var(--accent-d); }
     .btn-resolve:hover { background: #166534; color: #fff; border-color: #166534; }
     .btn-reopen:hover  { background: #92400e; color: #fff; border-color: #92400e; }
 
@@ -216,19 +227,21 @@
     .msg-bubble.agent-side { align-self: flex-start; align-items: flex-start; }
 
     .msg-sender { font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; }
-    .msg-bubble.user-side  .msg-sender { color: var(--accent); }
-    .msg-bubble.agent-side .msg-sender { color: var(--blue); }
+    .msg-bubble.user-side  .msg-sender { color: var(--accent-d); }
+    .msg-bubble.agent-side .msg-sender { color: var(--accent); }
 
     .msg-text {
       padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.5;
     }
     .msg-bubble.user-side  .msg-text {
-      background: linear-gradient(135deg, var(--accent-d), var(--accent));
+      background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
       color: #fff; border-radius: 14px 14px 4px 14px;
+      box-shadow: 0 4px 20px rgba(16,185,129,0.25);
     }
     .msg-bubble.agent-side .msg-text {
-      background: var(--surface2); border: 1px solid var(--border);
+      background: #ffffff; border: 1px solid var(--border);
       color: var(--text); border-radius: 14px 14px 14px 4px;
+      box-shadow: 0 2px 8px rgba(4,120,87,0.06);
     }
 
     .msg-time { font-size: 10px; color: var(--text-s); }
@@ -258,17 +271,17 @@
       font-family: inherit; font-size: 13.5px; outline: none; resize: none;
       transition: border-color 0.2s;
     }
-    .agent-input:focus { border-color: rgba(59,130,246,0.5); }
+    .agent-input:focus { border-color: rgba(16,185,129,0.5); }
     .agent-input::placeholder { color: var(--text-s); }
 
     .send-btn {
       width: 42px; height: 42px; border-radius: 50%; border: none;
-      background: linear-gradient(135deg, var(--blue-d), var(--blue));
+      background: linear-gradient(145deg, var(--accent-d), var(--accent));
       color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: transform 0.15s, box-shadow 0.15s;
-      box-shadow: 0 4px 14px rgba(59,130,246,0.35); flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(16,185,129,0.35); flex-shrink: 0;
     }
-    .send-btn:hover   { transform: scale(1.06); box-shadow: 0 6px 20px rgba(59,130,246,0.45); }
+    .send-btn:hover   { transform: scale(1.06); box-shadow: 0 6px 20px rgba(16,185,129,0.45); }
     .send-btn:active  { transform: scale(0.95); }
     .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
     .send-btn svg { width: 18px; height: 18px; margin-left: 2px; }
@@ -277,6 +290,162 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+    /* ── Tab bar ── */
+    .tabbar {
+      height: 50px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+    .tabbar-inner { display: flex; align-items: center; gap: 20px; width: 100%; }
+    .tabbar-brand { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .tabbar-brand .brand-dot { width: 26px; height: 26px; font-size: 12px; }
+    .tabbar-tabs { display: flex; gap: 6px; margin-left: auto; }
+    .tab {
+      padding: 7px 16px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--text-s);
+      cursor: pointer; transition: all 0.18s;
+    }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab.active {
+      background: linear-gradient(135deg, var(--accent-d), var(--accent));
+      border-color: var(--accent); color: #fff;
+    }
+
+    .panel-view { height: calc(100vh - 50px); display: flex; flex-direction: column; }
+
+    /* ── Marketing panel ── */
+    .mkt-wrap { flex: 1; overflow-y: auto; display: flex; gap: 20px; padding: 20px; }
+    .mkt-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 18px;
+    }
+    .mkt-form-col { width: 400px; min-width: 340px; flex-shrink: 0; align-self: flex-start; }
+    .mkt-list-col { flex: 1; min-width: 0; align-self: flex-start; }
+
+    .mkt-heading { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .mkt-sub { font-size: 12px; color: var(--text-s); margin-bottom: 16px; }
+
+    .mkt-field { margin-bottom: 14px; }
+    .mkt-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-s); margin-bottom: 6px; }
+    .mkt-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius-sm); padding: 9px 12px;
+      font-family: inherit; font-size: 13px; outline: none; transition: border-color 0.2s;
+    }
+    .mkt-input:focus { border-color: var(--accent); }
+    .mkt-input::placeholder { color: var(--text-s); }
+    textarea.mkt-input { resize: vertical; min-height: 64px; }
+    .mkt-row { display: flex; gap: 10px; }
+    .mkt-row .mkt-field { flex: 1; }
+
+    .mkt-picker { position: relative; }
+    .mkt-picker-results {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      max-height: 240px; overflow-y: auto; display: none;
+    }
+    .mkt-picker-results.open { display: block; }
+    .mkt-pick-item {
+      padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .mkt-pick-item:hover { background: var(--surface3); }
+    .mkt-pick-thumb { width: 34px; height: 34px; border-radius: 8px; background-size: cover; background-position: center; flex-shrink: 0; }
+    .mkt-pick-name { font-weight: 600; }
+    .mkt-pick-price { font-size: 11px; color: var(--text-s); }
+
+    .mkt-selected {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface2); border: 1px solid var(--accent);
+      border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px;
+    }
+    .mkt-selected .mkt-pick-thumb { width: 44px; height: 44px; }
+    .mkt-selected-info { flex: 1; min-width: 0; }
+    .mkt-selected-name { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mkt-selected-price { font-size: 12px; color: var(--text-s); }
+    .mkt-selected-x { background: none; border: none; color: var(--text-s); font-size: 16px; cursor: pointer; padding: 4px; }
+    .mkt-selected-x:hover { color: var(--red); }
+
+    .mkt-create-btn {
+      width: 100%; padding: 11px; border: none; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent-d), var(--accent));
+      color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+    }
+    .mkt-create-btn:hover { transform: translateY(-1px); }
+    .mkt-create-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .mkt-preview-title { font-size: 12px; font-weight: 700; color: var(--text-s); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+
+    .mkt-promo-preview {
+      background: #fff; border-radius: 14px; overflow: hidden; border: 1px solid var(--border);
+      box-shadow: 0 6px 18px rgba(16,185,129,0.1); margin-bottom: 20px; color: var(--text);
+    }
+    .mkt-preview-img { height: 140px; background-size: cover; background-position: center; position: relative; }
+    .mkt-preview-badge {
+      position: absolute; top: 10px; left: 10px;
+      background: linear-gradient(135deg, #ef4444, #f97316); color: #fff;
+      font-size: 11px; font-weight: 800; padding: 4px 9px; border-radius: 20px;
+    }
+    .mkt-preview-body { padding: 12px 14px; }
+    .mkt-preview-tag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #047857; background: #ecfdf5; border: 1px solid rgba(16,185,129,0.3); border-radius: 6px; padding: 2px 7px; margin-bottom: 7px; }
+    .mkt-preview-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+    .mkt-preview-price { font-size: 15px; font-weight: 800; color: #047857; margin-bottom: 7px; }
+    .mkt-preview-details { font-size: 12px; color: #6b7280; line-height: 1.45; }
+
+    .mkt-promo-item {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center;
+    }
+    .mkt-promo-thumb { width: 52px; height: 52px; border-radius: 10px; background-size: cover; background-position: center; flex-shrink: 0; }
+    .mkt-promo-body { flex: 1; min-width: 0; }
+    .mkt-promo-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .mkt-promo-name { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mkt-status-chip {
+      padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .chip-active   { background: rgba(34,197,94,0.15);   color: var(--green); }
+    .chip-scheduled{ background: rgba(59,130,246,0.15);  color: var(--blue); }
+    .chip-paused   { background: rgba(245,158,11,0.15);  color: var(--orange); }
+    .chip-expired  { background: rgba(239,68,68,0.15);   color: var(--red); }
+    .mkt-promo-dates { font-size: 11px; color: var(--text-s); }
+    .mkt-promo-msg { font-size: 12px; color: var(--text-s); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mkt-promo-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .mkt-mini-btn {
+      padding: 5px 11px; border-radius: 7px; font-size: 11.5px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface3); color: var(--text);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .mkt-mini-btn:hover { background: var(--surface2); }
+    .mkt-mini-btn.green { color: var(--green); border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.1); }
+    .mkt-mini-btn.green:hover { background: #166534; color: #fff; }
+    .mkt-mini-btn.pause { color: var(--orange); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.1); }
+    .mkt-mini-btn.pause:hover { background: #92400e; color: #fff; }
+    .mkt-mini-btn.danger { color: var(--red); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.1); }
+    .mkt-mini-btn.danger:hover { background: #991b1b; color: #fff; }
+
+    .mkt-empty { padding: 30px 20px; text-align: center; color: var(--text-s); font-size: 13px; }
+
+    .mkt-toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 50;
+      background: var(--surface3); border: 1px solid var(--accent); color: var(--text);
+      padding: 12px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+      box-shadow: 0 6px 20px rgba(4,120,87,0.2); opacity: 0; transform: translateY(10px);
+      transition: all 0.25s; pointer-events: none;
+    }
+    .mkt-toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 900px) {
+      .mkt-wrap { flex-direction: column; }
+      .mkt-form-col { width: 100%; min-width: 0; }
+    }
 
     @media (max-width: 700px) {
       .sidebar { width: 100%; min-width: 0; }
@@ -288,6 +457,18 @@
   </style>
 </head>
 <body>
+
+<nav class="tabbar">
+  <div class="tabbar-inner">
+    <span class="tabbar-brand"><span class="brand-dot">G</span>GojoShop.et Admin</span>
+    <div class="tabbar-tabs">
+      <button class="tab active" data-tab="support">🎧 Support</button>
+      <button class="tab" data-tab="marketing">📣 Marketing</button>
+    </div>
+  </div>
+</nav>
+
+<div id="supportPanel" class="panel-view">
 
 <div class="layout" id="layout">
 
@@ -372,6 +553,91 @@
     </div>
   </main>
 </div>
+
+</div><!-- /supportPanel -->
+
+<!-- ── MARKETING / PROMOTIONS PANEL ── -->
+<section id="marketingPanel" class="panel-view" style="display:none">
+  <div class="mkt-wrap">
+
+    <!-- LEFT: Create form -->
+    <div class="mkt-card mkt-form-col">
+      <div class="mkt-heading">📣 Create a promotion</div>
+      <div class="mkt-sub">Pick a product, write your offer, schedule it — it'll show up in the chat.</div>
+
+      <div class="mkt-field">
+        <label class="mkt-label">Product</label>
+        <div class="mkt-picker">
+          <input type="text" class="mkt-input" id="promoProductSearch" placeholder="Search products by name…" autocomplete="off" />
+          <div class="mkt-picker-results" id="promoProductResults"></div>
+        </div>
+        <div class="mkt-selected" id="promoSelected" style="display:none">
+          <div class="mkt-pick-thumb" id="promoSelectedThumb"></div>
+          <div class="mkt-selected-info">
+            <div class="mkt-selected-name" id="promoSelectedName">—</div>
+            <div class="mkt-selected-price" id="promoSelectedPrice">—</div>
+          </div>
+          <button class="mkt-selected-x" id="promoSelectedClear" title="Clear">✕</button>
+        </div>
+      </div>
+
+      <div class="mkt-field">
+        <label class="mkt-label">Campaign title <span style="opacity:.6">(optional)</span></label>
+        <input type="text" class="mkt-input" id="promoTitle" placeholder="e.g. Summer Sale" />
+      </div>
+
+      <div class="mkt-field">
+        <label class="mkt-label">Offer message <span style="opacity:.6">(optional)</span></label>
+        <textarea class="mkt-input" id="promoMessage" placeholder="e.g. Get the iPhone 15 at 15% off, only this week!"></textarea>
+      </div>
+
+      <div class="mkt-row">
+        <div class="mkt-field">
+          <label class="mkt-label">Discount %</label>
+          <input type="number" class="mkt-input" id="promoDiscount" min="0" max="100" value="0" />
+        </div>
+      </div>
+
+      <div class="mkt-row">
+        <div class="mkt-field">
+          <label class="mkt-label">Start (optional)</label>
+          <input type="datetime-local" class="mkt-input" id="promoStart" />
+        </div>
+        <div class="mkt-field">
+          <label class="mkt-label">End (optional)</label>
+          <input type="datetime-local" class="mkt-input" id="promoEnd" />
+        </div>
+      </div>
+
+      <button class="mkt-create-btn" id="promoCreateBtn">🚀 Launch promotion</button>
+    </div>
+
+    <!-- RIGHT: Preview + list -->
+    <div class="mkt-card mkt-list-col">
+      <div class="mkt-heading">Live preview</div>
+      <div class="mkt-sub">Exactly how it appears in the chatbot.</div>
+
+      <div class="mkt-preview-title">Preview</div>
+      <div class="mkt-promo-preview" id="promoPreview">
+        <div class="mkt-preview-img" id="previewImg">
+          <div class="mkt-preview-badge" id="previewBadge" style="display:none"></div>
+        </div>
+        <div class="mkt-preview-body">
+          <div class="mkt-preview-tag" id="previewTag" style="display:none"></div>
+          <div class="mkt-preview-name" id="previewName">Select a product to preview</div>
+          <div class="mkt-preview-price" id="previewPrice"></div>
+          <div class="mkt-preview-details" id="previewDetails"></div>
+        </div>
+      </div>
+
+      <div class="mkt-preview-title" style="margin-top:6px">Active & scheduled campaigns</div>
+      <div id="promoList"></div>
+    </div>
+
+  </div>
+</section>
+
+<div class="mkt-toast" id="mktToast"></div>
 
 <script>
 /* ── Utils ── */
@@ -625,6 +891,266 @@ document.getElementById('refreshBtn').addEventListener('click', loadRequests);
 /* ── Bootstrap ── */
 loadRequests();
 setInterval(loadRequests, 10000);
+
+/* ==================================================================
+   MARKETING / PROMOTIONS TAB
+================================================================== */
+/* ── Tab switching ── */
+const supportPanel    = document.getElementById('supportPanel');
+const marketingPanel  = document.getElementById('marketingPanel');
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const showMarketing = tab.dataset.tab === 'marketing';
+    supportPanel.style.display   = showMarketing ? 'none' : 'flex';
+    marketingPanel.style.display = showMarketing ? 'flex' : 'none';
+    if (showMarketing) loadPromotions();
+  });
+});
+
+/* ── Small helpers ── */
+function toast(msg) {
+  const el = document.getElementById('mktToast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function promoThumb(thumbnail, name) {
+  if (thumbnail && String(thumbnail).startsWith('http')) return thumbnail;
+  if (thumbnail && thumbnail !== 'def.png') return 'https://gojoshop.et/storage/product/thumbnail/' + thumbnail;
+  return 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=400&q=80';
+}
+
+/* ── State ── */
+let promoSelectedProduct = null;
+let promoSearchTimer = null;
+
+const promoProductSearch = document.getElementById('promoProductSearch');
+const promoProductResults = document.getElementById('promoProductResults');
+
+promoProductSearch.addEventListener('input', () => {
+  clearTimeout(promoSearchTimer);
+  const q = promoProductSearch.value.trim();
+  if (!q) { promoProductResults.classList.remove('open'); promoProductResults.innerHTML = ''; return; }
+  promoSearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch('/api/promotions/products?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      const products = data.products || [];
+      promoProductResults.innerHTML = products.map(p => `
+        <div class="mkt-pick-item" data-id="${esc(p.id)}" data-name="${esc(p.name)}" data-price="${esc(p.unit_price)}" data-thumb="${esc(p.thumbnail)}">
+          <div class="mkt-pick-thumb" style="background-image:url('${esc(promoThumb(p.thumbnail, p.name))}')"></div>
+          <div>
+            <div class="mkt-pick-name">${esc(p.name)}</div>
+            <div class="mkt-pick-price">${esc(Number(p.unit_price || 0).toLocaleString())} ETB</div>
+          </div>
+        </div>`).join('') || `<div class="mkt-pick-item" style="color:var(--text-s)">No products found</div>`;
+      promoProductResults.classList.add('open');
+      promoProductResults.querySelectorAll('.mkt-pick-item').forEach(el => {
+        el.addEventListener('click', () => selectPromoProduct(el.dataset.id, el.dataset.name, el.dataset.price, el.dataset.thumb));
+      });
+    } catch (e) { console.error('Product search error:', e); }
+  }, 300);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.mkt-picker')) promoProductResults.classList.remove('open');
+});
+
+function selectPromoProduct(id, name, price, thumb) {
+  promoSelectedProduct = { id, name, price, thumb };
+  document.getElementById('promoSelectedName').textContent = name;
+  document.getElementById('promoSelectedPrice').textContent = Number(price || 0).toLocaleString() + ' ETB';
+  document.getElementById('promoSelectedThumb').style.backgroundImage = `url('${promoThumb(thumb, name)}')`;
+  document.getElementById('promoSelected').style.display = 'flex';
+  promoProductResults.classList.remove('open');
+  promoProductSearch.value = '';
+  updatePromoPreview();
+}
+
+document.getElementById('promoSelectedClear').addEventListener('click', () => {
+  promoSelectedProduct = null;
+  document.getElementById('promoSelected').style.display = 'none';
+  updatePromoPreview();
+});
+
+/* ── Live preview ── */
+function updatePromoPreview() {
+  const discount = Number(document.getElementById('promoDiscount').value) || 0;
+  const title = document.getElementById('promoTitle').value.trim();
+  const message = document.getElementById('promoMessage').value.trim();
+  const badge = document.getElementById('previewBadge');
+  const tag = document.getElementById('previewTag');
+
+  if (!promoSelectedProduct) {
+    document.getElementById('previewImg').style.backgroundImage = '';
+    document.getElementById('previewName').textContent = 'Select a product to preview';
+    document.getElementById('previewPrice').textContent = '';
+    document.getElementById('previewDetails').textContent = '';
+    badge.style.display = 'none';
+    tag.style.display = 'none';
+    return;
+  }
+  const p = promoSelectedProduct;
+  document.getElementById('previewImg').style.backgroundImage = `url('${promoThumb(p.thumb, p.name)}')`;
+  document.getElementById('previewName').textContent = p.name;
+  document.getElementById('previewPrice').textContent = Number(p.price || 0).toLocaleString() + ' ETB';
+  if (discount > 0) {
+    badge.textContent = discount + '% OFF';
+    badge.style.display = '';
+  } else { badge.style.display = 'none'; }
+  if (title) {
+    tag.textContent = title;
+    tag.style.display = '';
+  } else { tag.style.display = 'none'; }
+  document.getElementById('previewDetails').textContent = message || 'Add an offer message to tell customers why they should grab it!';
+}
+['promoDiscount', 'promoTitle', 'promoMessage'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePromoPreview);
+});
+
+/* ── Create promotion ── */
+document.getElementById('promoCreateBtn').addEventListener('click', async () => {
+  if (!promoSelectedProduct) { toast('⚠️ Select a product first'); return; }
+  const btn = document.getElementById('promoCreateBtn');
+  btn.disabled = true;
+  try {
+    const payload = {
+      product_id: promoSelectedProduct.id,
+      title: document.getElementById('promoTitle').value.trim(),
+      message: document.getElementById('promoMessage').value.trim(),
+      discount: Number(document.getElementById('promoDiscount').value) || 0,
+      start: document.getElementById('promoStart').value,
+      end: document.getElementById('promoEnd').value,
+      active: true
+    };
+    const res = await fetch('/api/promotions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Create failed');
+    toast('✅ Promotion launched!');
+    resetPromoForm();
+    await loadPromotions();
+  } catch (e) {
+    console.error(e);
+    toast('⚠️ Could not create promotion');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function resetPromoForm() {
+  promoSelectedProduct = null;
+  document.getElementById('promoSelected').style.display = 'none';
+  document.getElementById('promoTitle').value = '';
+  document.getElementById('promoMessage').value = '';
+  document.getElementById('promoDiscount').value = 0;
+  document.getElementById('promoStart').value = '';
+  document.getElementById('promoEnd').value = '';
+  updatePromoPreview();
+}
+
+/* ── List / manage promotions ── */
+const statusMeta = {
+  active:    { cls: 'chip-active',    label: 'Live' },
+  scheduled: { cls: 'chip-scheduled', label: 'Scheduled' },
+  paused:    { cls: 'chip-paused',    label: 'Paused' },
+  expired:   { cls: 'chip-expired',   label: 'Expired' }
+};
+
+async function loadPromotions() {
+  try {
+    const res = await fetch('/api/promotions');
+    const data = await res.json();
+    renderPromotions(data.promotions || []);
+  } catch (e) {
+    console.error('Load promotions error:', e);
+  }
+}
+
+function fmtPromoDate(v) {
+  if (!v) return 'forever';
+  return new Date(v).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function renderPromotions(list) {
+  const el = document.getElementById('promoList');
+  if (!list.length) {
+    el.innerHTML = `<div class="mkt-empty">📣 No promotions yet — create your first one on the left!</div>`;
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    const meta = statusMeta[p.status] || statusMeta.paused;
+    const product = p.product || {};
+    const name = product.name || 'Product #' + p.product_id;
+    const thumb = promoThumb(product.thumbnail, name);
+    const discount = Number(p.discount) || 0;
+    const isLive = p.status === 'active';
+    return `
+      <div class="mkt-promo-item">
+        <div class="mkt-promo-thumb" style="background-image:url('${esc(thumb)}')"></div>
+        <div class="mkt-promo-body">
+          <div class="mkt-promo-top">
+            <span class="mkt-promo-name">${esc(name)}</span>
+            ${discount ? `<span class="mkt-status-chip chip-expired">${esc(discount)}% OFF</span>` : ''}
+            <span class="mkt-status-chip ${meta.cls}">${meta.label}</span>
+          </div>
+          <div class="mkt-promo-dates">📅 ${fmtPromoDate(p.start)} → ${fmtPromoDate(p.end)}</div>
+          ${p.message ? `<div class="mkt-promo-msg">${esc(p.message)}</div>` : ''}
+        </div>
+        <div class="mkt-promo-actions">
+          ${isLive
+            ? `<button class="mkt-mini-btn pause" data-action="toggle" data-id="${esc(p.id)}" data-active="false">Pause</button>`
+            : `<button class="mkt-mini-btn green" data-action="toggle" data-id="${esc(p.id)}" data-active="true">Activate</button>`}
+          <button class="mkt-mini-btn danger" data-action="delete" data-id="${esc(p.id)}">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.querySelectorAll('.mkt-mini-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      if (btn.dataset.action === 'toggle') {
+        updatePromoActive(id, btn.dataset.active === 'true');
+      } else if (btn.dataset.action === 'delete') {
+        if (confirm('Delete this promotion?')) deletePromotion(id);
+      }
+    });
+  });
+}
+
+async function updatePromoActive(id, active) {
+  try {
+    const res = await fetch('/api/promotions/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active })
+    });
+    if (!res.ok) throw new Error('Toggle failed');
+    toast(active ? '✅ Promotion activated' : '⏸ Promotion paused');
+    await loadPromotions();
+  } catch (e) {
+    console.error(e);
+    toast('⚠️ Update failed');
+  }
+}
+
+async function deletePromotion(id) {
+  try {
+    const res = await fetch('/api/promotions/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    toast('🗑 Promotion deleted');
+    await loadPromotions();
+  } catch (e) {
+    console.error(e);
+    toast('⚠️ Delete failed');
+  }
+}
 </script>
 </body>
 </html>

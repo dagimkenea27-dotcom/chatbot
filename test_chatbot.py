@@ -26,7 +26,7 @@ class FakeDB:
         }
     ]
 
-    def search_products(self, query, limit=5, filters=None):
+    def search_products(self, query, limit=5, filters=None, offset=0):
         filters = filters or {}
         query = query.lower()
         results = [p for p in self.products if all(word in p["name"].lower() for word in query.split())]
@@ -38,7 +38,7 @@ class FakeDB:
             results = [p for p in results if p["current_stock"] > 0]
         if filters.get("sort") == "price_asc":
             results = sorted(results, key=lambda p: p["unit_price"])
-        return results[:limit]
+        return results[offset:offset + limit]
 
     def get_related_products(self, keyword, exclude_ids=None, limit=4):
         exclude_ids = set(exclude_ids or [])
@@ -59,9 +59,25 @@ class RecordingDB(FakeDB):
         super().__init__()
         self.calls = []
 
-    def search_products(self, query, limit=5, filters=None):
-        self.calls.append((query, limit, filters))
-        return super().search_products(query, limit=limit, filters=filters)
+    def search_products(self, query, limit=5, filters=None, offset=0):
+        self.calls.append((query, limit, filters, offset))
+        return super().search_products(query, limit=limit, filters=filters, offset=offset)
+
+
+class PagedDB(FakeDB):
+    """FakeDB with more products than one page, to exercise pagination."""
+    products = [
+        {
+            "id": i,
+            "name": f"iPhone {i}",
+            "unit_price": 1000 + i,
+            "current_stock": 5,
+            "details": "Apple smartphone",
+            "thumbnail": f"iphone{i}.jpg",
+            "slug": f"iphone-{i}",
+        }
+        for i in range(1, 26)
+    ]
 
 
 class TestGojoShopChatbot(unittest.TestCase):
@@ -118,6 +134,33 @@ class TestGojoShopChatbot(unittest.TestCase):
         self.chatbot.reset_session(self.user_id)
 
         self.assertIsNone(self.chatbot.get_active_support_request(self.user_id))
+
+    def test_show_more_paginates_results(self):
+        chatbot = GojoShopChatbot(db_manager=PagedDB())
+        user = "paged_user_1"
+
+        first = chatbot.get_response(user, "show me iphone")
+        self.assertIn("HasMore: true", first)
+        self.assertEqual(first.split("RECOMMENDATIONS")[0].count("Product ID:"), 10)
+
+        second = chatbot.get_response(user, "show more")
+        self.assertIn("HasMore: true", second)
+        self.assertEqual(second.count("Product ID:"), 10)
+
+        third = chatbot.get_response(user, "show more")
+        self.assertEqual(third.count("Product ID:"), 5)
+        self.assertIn("HasMore: false", third)
+
+        fourth = chatbot.get_response(user, "show more")
+        self.assertIn("no_more_products" if "no_more_products" in fourth else "That's everything", fourth)
+
+    def test_show_more_keeps_filters(self):
+        chatbot = GojoShopChatbot(db_manager=PagedDB())
+        user = "paged_user_2"
+
+        chatbot.get_response(user, "show me iphone under 1200")
+        next_page = chatbot.get_response(user, "show more")
+        self.assertIn("max_price=1200", next_page)
 
     def test_chat_template_and_helper_use_real_utf8_emojis(self):
         template_path = Path(__file__).with_name("templates") / "chatbot.html"

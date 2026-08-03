@@ -199,11 +199,14 @@ class DatabaseManager:
             logger.error(f"get_order_items error: {e}")
             return []
 
-    def search_products(self, query: str, limit: int = 5, filters: dict | None = None) -> list[dict]:
+    def search_products(self, query: str, limit: int = 5, filters: dict | None = None,
+                        offset: int = 0) -> list[dict]:
         """
         Search active products by matching each word against name, details, or meta_description.
         Every word must appear in at least one of those fields.
         Returns a list of dicts with product details, or [] on failure.
+
+        ``offset`` supports pagination for "show more" style follow-up requests.
         """
         filters = filters or {}
         words = [w.strip() for w in query.split() if w.strip()]
@@ -246,12 +249,12 @@ class DatabaseManager:
                     "FROM products "
                     f"WHERE {' AND '.join(where_parts)} "
                     f"ORDER BY {order_by} "
-                    "LIMIT %s"
+                    "LIMIT %s OFFSET %s"
                 )
                 broad_term = f"%{query}%"
                 if filters.get("sort") not in {"price_asc", "price_desc", "newest"}:
                     params.extend([broad_term, broad_term])
-                params.append(limit)
+                params.extend([limit, offset])
                 cur.execute(sql, params)
                 rows = cur.fetchall()
             conn.close()

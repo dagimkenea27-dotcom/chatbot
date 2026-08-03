@@ -29,12 +29,14 @@ class ProductService:
             }
         }
     
-    def search_products(self, keyword: str, limit: int = 10, filters: dict = None) -> List[Dict]:
+    def search_products(self, keyword: str, limit: int = 10, filters: dict = None,
+                        offset: int = 0) -> List[Dict]:
         """Search products by keyword with filters."""
         if self.db is None:
             return []
         try:
-            return self.db.search_products(keyword, limit=limit, filters=filters or {})
+            return self.db.search_products(
+                keyword, limit=limit, filters=filters or {}, offset=offset)
         except Exception as e:
             print(f"Error searching products: {e}")
             return []
@@ -59,11 +61,17 @@ class ProductService:
             print(f"Error getting related products: {e}")
             return []
     
-    def format_search_card(self, products: list, filters: dict = None, recommendations: list = None) -> str:
-        """Format product search results as a structured card."""
+    def format_search_card(self, products: list, filters: dict = None,
+                           recommendations: list = None,
+                           has_more: bool = False) -> str:
+        """Format product search results as a structured card.
+
+        ``has_more`` tells the frontend whether a "Show more" button should be
+        shown (i.e. whether another page of results may exist).
+        """
         filters = filters or {}
         recommendations = recommendations or []
-        
+
         filter_parts = []
         if "min_price" in filters:
             filter_parts.append(f"min_price={filters['min_price']:.0f}")
@@ -74,6 +82,7 @@ class ProductService:
         if "sort" in filters:
             filter_parts.append(f"sort={filters['sort']}")
         filters_str = ";".join(filter_parts) if filter_parts else "none"
+        has_more_str = "true" if has_more else "false"
         
         def product_block(p):
             price = p.get("unit_price", p.get("price", 0))
@@ -94,7 +103,7 @@ class ProductService:
             )
         
         blocks = "\n---\n".join(product_block(p) for p in products)
-        card = f"PRODUCT SEARCH\nFilters: {filters_str}\n{blocks}"
+        card = f"PRODUCT SEARCH\nFilters: {filters_str}\nHasMore: {has_more_str}\n{blocks}"
         
         if recommendations:
             rec_blocks = "\n---\n".join(product_block(p) for p in recommendations)

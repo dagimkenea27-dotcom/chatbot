@@ -13,6 +13,7 @@ from chatbot.services.order_service import OrderService
 from chatbot.services.faq_service import FAQService
 from chatbot.services.support_service import SupportService
 from chatbot.services.cart_service import CartService
+from chatbot.services.promotion_service import PromotionService
 from chatbot.nlp.intent_detector import IntentDetector
 from chatbot.nlp.entity_extractor import EntityExtractor
 from chatbot.nlp.sentiment import SentimentAnalyzer
@@ -35,11 +36,12 @@ class GojoShopChatbot:
         self.faq_service = FAQService()
         self.support_service = SupportService(db_manager)
         self.cart_service = CartService(db_manager)
+        self.promotion_service = PromotionService(db_manager)
         self.conversation_service = ConversationService()
         
         # Initialize NLP components
-        self.intent_detector = IntentDetector()
         self.entity_extractor = EntityExtractor()
+        self.intent_detector = IntentDetector(entity_extractor=self.entity_extractor)
         self.sentiment_analyzer = SentimentAnalyzer()
         
         # Conversation memory
@@ -312,6 +314,14 @@ class GojoShopChatbot:
             "loyalty": self._handle_loyalty,
             "cancellation": self._handle_cancellation,
             "checkout": self._handle_checkout,
+            "stock": self._handle_stock,
+            "authenticity": self._handle_authenticity,
+            "wholesale": self._handle_wholesale,
+            "gift": self._handle_gift,
+            "invoice": self._handle_invoice,
+            "order_change": self._handle_order_change,
+            "international": self._handle_international,
+            "installment": self._handle_installment,
             "help": self._handle_help,
             "human_support": self._handle_human_support,
             "farewell": self._handle_farewell,
@@ -363,7 +373,44 @@ class GojoShopChatbot:
             f"Hey there! 🌟 I'm Sami from {shop}. Before we start, I'd love to know your name!",
             f"Hello! ✨ I'm Sami, here to help you find amazing products at {shop}. Mind telling me your name?"
         ]
-        return random.choice(name_greetings)
+        base = random.choice(name_greetings)
+        promo = self.promotion_service.get_featured()
+        if promo and not session.promo_aware:
+            session.promo_aware = True
+            base += "\n\n" + self._promo_card(promo, session, intro_key="promo_greeting_intro")
+        return base
+
+    def _promo_card(self, featured: dict, session, intro_key: str = "promo_greeting_intro",
+                    intro: Optional[str] = None) -> str:
+        """Build a PROMO card string for a featured promo + product."""
+        promo, product = featured["promo"], featured["product"]
+        if intro is None:
+            name = product.get("name", "")
+            discount = promo.get("discount", 0) or 0
+            intro = self.translation_service.translate(
+                session, intro_key, name=name, discount=f"{discount:g}"
+            )
+        return self.promotion_service.format_promo_card(promo, product, intro=intro)
+
+    def featured_promo_card(self, lang: str = "en") -> Optional[str]:
+        """Return the featured live promo card localized to ``lang``, or None.
+
+        Used by the chat frontend to surface an active offer the moment the
+        customer opens the chat, without waiting for them to type a greeting.
+        """
+        from types import SimpleNamespace
+
+        featured = self.promotion_service.get_featured()
+        if not featured:
+            return None
+        promo, product = featured["promo"], featured["product"]
+        name = product.get("name", "")
+        discount = promo.get("discount", 0) or 0
+        session = SimpleNamespace(language=lang if lang in ("en", "am") else "en")
+        intro = self.translation_service.translate(
+            session, "promo_greeting_intro", name=name, discount=f"{discount:g}"
+        )
+        return self.promotion_service.format_promo_card(promo, product, intro=intro)
     
     def _handle_small_talk(self, message: str, session) -> str:
         """Handle casual small talk."""
@@ -439,7 +486,9 @@ class GojoShopChatbot:
         session.last_products = products
         session.last_product = products[0]
         
-        return self.product_service.format_search_card(products, filters=filters, recommendations=recommendations)
+        return self.product_service.format_search_card(
+            products, filters=filters, recommendations=recommendations,
+            has_more=len(products) >= 10)
     
     def _handle_add_to_cart_id(self, message: str, session) -> str:
         import re
@@ -536,8 +585,20 @@ class GojoShopChatbot:
         keyword = session.last_search_keyword
         if not keyword:
             return self.translation_service.translate(session, "repeat_search_empty")
-        filter_phrase = self.entity_extractor.format_filter_phrase(session.last_product_filters)
-        return self._handle_product_search(f"search {keyword} {filter_phrase}", session)
+        filters = session.last_product_filters or {}
+        # Page 2+ of an existing search: offset past what has been shown.
+        offset = len(session.last_products or [])
+        products = self.product_service.search_products(
+            keyword, limit=10, filters=filters, offset=offset)
+        if not products:
+            return self.translation_service.translate(
+                session, "no_more_products", keyword=keyword)
+        session.last_products = list(session.last_products or []) + products
+        if session.last_product is None:
+            session.last_product = products[0]
+        return self.product_service.format_search_card(
+            products, filters=filters, recommendations=[],
+            has_more=len(products) >= 10)
     
     def _handle_shipping(self, message: str, session) -> str:
         session.faq_topics_seen.append("shipping")
@@ -567,12 +628,62 @@ class GojoShopChatbot:
     def _handle_promotions(self, message: str, session) -> str:
         session.faq_topics_seen.append("promotions")
         session.promo_aware = True
+        active = self.promotion_service.get_active()
+        cards = []
+        for promo in active[:3]:
+            product = self.promotion_service.get_product(promo.get("product_id"))
+            if product:
+                cards.append(self.promotion_service.format_promo_card(promo, product))
+        if cards:
+            intro = self.translation_service.translate(session, "promo_deals_intro")
+            return intro + "\n\n" + "\n\n".join(cards)
         return self.translation_service.translate(session, "promotions_info")
     
     def _handle_loyalty(self, message: str, session) -> str:
         session.faq_topics_seen.append("loyalty")
         session.loyalty_aware = True
         return self.translation_service.translate(session, "loyalty_info")
+    
+    def _handle_stock(self, message: str, session) -> str:
+        session.faq_topics_seen.append("stock")
+        # If the user asks about a specific product's availability, point to it.
+        product_name = session.last_product.get("name") if session.last_product else None
+        if product_name and not message.lower().strip().endswith(("stock", "ክምችት")):
+            return self.translation_service.translate(
+                session, "stock_specific", product=product_name
+            )
+        return self.translation_service.translate(session, "stock_info")
+    
+    def _handle_authenticity(self, message: str, session) -> str:
+        session.faq_topics_seen.append("authenticity")
+        return self.translation_service.translate(
+            session, "authenticity_info",
+            shop=os.getenv("SHOP_NAME", "GojoShop.et")
+        )
+    
+    def _handle_wholesale(self, message: str, session) -> str:
+        session.faq_topics_seen.append("wholesale")
+        return self.translation_service.translate(session, "wholesale_info")
+    
+    def _handle_gift(self, message: str, session) -> str:
+        session.faq_topics_seen.append("gift")
+        return self.translation_service.translate(session, "gift_info")
+    
+    def _handle_invoice(self, message: str, session) -> str:
+        session.faq_topics_seen.append("invoice")
+        return self.translation_service.translate(session, "invoice_info")
+    
+    def _handle_order_change(self, message: str, session) -> str:
+        session.faq_topics_seen.append("order_change")
+        return self.translation_service.translate(session, "order_change_info")
+    
+    def _handle_international(self, message: str, session) -> str:
+        session.faq_topics_seen.append("international")
+        return self.translation_service.translate(session, "international_info")
+    
+    def _handle_installment(self, message: str, session) -> str:
+        session.faq_topics_seen.append("installment")
+        return self.translation_service.translate(session, "installment_info")
     
     def _handle_cancellation(self, message: str, session) -> str:
         lang = session.language

@@ -21,7 +21,7 @@ class PersonalityService:
     
     def apply_enhancement(self, response: str, session, intent: str, sentiment: str) -> str:
         """Apply personality enhancements to the response."""
-        if "━━━" in response or response.startswith("⚠️") or response.startswith("["):
+        if "━━━" in response or "PROMO" in response or response.startswith("⚠️") or response.startswith("["):
             return response
         
         lang = session.language if session else "en"
@@ -47,7 +47,7 @@ class PersonalityService:
     
     def wrap_natural(self, response: str, session, intent: str) -> str:
         """Prepend a natural opener to plain-text replies."""
-        if intent in ("farewell", "human_support", "small_talk", "greeting") or "━━━" in response or response.startswith("⚠️"):
+        if intent in ("farewell", "human_support", "small_talk", "greeting") or "━━━" in response or "PROMO" in response or response.startswith("⚠️"):
             return response
         
         if len(response.split()) < 10 and intent not in ["greeting", "small_talk"]:

@@ -76,6 +76,7 @@ function isProductCard(text) {
 function parseProductCard(text) {
   const [resultText, recText = ''] = text.split('RECOMMENDATIONS');
   const filtersLine = resultText.split('\n').find(line => line.trim().startsWith('Filters:'));
+  const hasMoreLine = resultText.split('\n').find(line => line.trim().startsWith('HasMore:'));
 
   function parseProducts(block) {
     const sections = block.split('\n---');
@@ -85,7 +86,7 @@ function parseProductCard(text) {
       const prod = {};
       for (const line of lines) {
         const t = line.trim();
-        if (!t || t.startsWith('Filters:') || t.includes('PRODUCT SEARCH')) continue;
+        if (!t || t.startsWith('Filters:') || t.startsWith('HasMore:') || t.includes('PRODUCT SEARCH')) continue;
         if (t.startsWith('Product ID:')) { prod.id = t.replace('Product ID:', '').trim(); continue; }
         if (t.startsWith('Name:')) { prod.name = t.replace('Name:', '').trim(); continue; }
         if (t.startsWith('Price:')) { prod.price = t.replace('Price:', '').trim(); continue; }
@@ -102,6 +103,7 @@ function parseProductCard(text) {
     products: parseProducts(resultText),
     recommendations: parseProducts(recText),
     filters: filtersLine ? filtersLine.replace('Filters:', '').trim() : 'none',
+    hasMore: hasMoreLine ? hasMoreLine.replace('HasMore:', '').trim() === 'true' : false,
   };
 }
 
@@ -253,6 +255,9 @@ function renderProductGrid(data) {
   const recSection = recommendations.length
     ? `<div class="recommendation-section"><div class="recommendation-title">${i18n.t('rec_alternatives', 'Recommended alternatives')}</div><div class="product-track">${recCards}</div></div>`
     : '';
+  const showMoreBtn = data.hasMore
+    ? `<button class="show-more-btn" onclick="showMoreProducts()">${i18n.t('show_more', 'Show more')}</button>`
+    : '';
   return `
     <div class="product-results">
       <div class="product-results-header">
@@ -262,6 +267,7 @@ function renderProductGrid(data) {
       <div class="product-filter-bar">${filterButtons}</div>
       <div class="active-filters">${escHtml(activeFilters)}</div>
       <div class="product-track">${cards}</div>
+      ${showMoreBtn}
       ${recSection}
     </div>`;
 }
@@ -315,6 +321,69 @@ function renderSupportCard(data) {
 
 function isOrderCard(text) {
   return text.startsWith('━━━') && !text.includes('PRODUCT SEARCH') && !isSupportCard(text);
+}
+
+/* Promo card renderer */
+function isPromoCard(text) {
+  return text.includes('PROMO');
+}
+
+function parsePromoCard(text) {
+  const data = {};
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || t === 'PROMO') continue;
+    if (t.startsWith('Intro:')) data.intro = t.replace('Intro:', '').trim();
+    else if (t.startsWith('Title:')) data.title = t.replace('Title:', '').trim();
+    else if (t.startsWith('Name:')) data.name = t.replace('Name:', '').trim();
+    else if (t.startsWith('Price:')) data.price = t.replace('Price:', '').trim();
+    else if (t.startsWith('Discount:')) data.discount = t.replace('Discount:', '').trim();
+    else if (t.startsWith('Details:')) data.details = t.replace('Details:', '').trim();
+    else if (t.startsWith('Image:')) data.image = t.replace('Image:', '').trim();
+    else if (t.startsWith('Id:')) data.id = t.replace('Id:', '').trim();
+  }
+  return data;
+}
+
+function renderPromoCard(data) {
+  const safeName = escHtml(data.name || '');
+  const safeTitle = escHtml(data.title || '');
+  const safePrice = escHtml(data.price || '');
+  const safeDetails = escHtml(data.details || '');
+  const discountMatch = (data.discount || '').match(/([\d.]+)/);
+  const discountPct = discountMatch ? discountMatch[1] : '';
+  const imgUrl = resolveProductImage(data.image, data.name);
+  const safeImage = escHtml(imgUrl);
+  const productId = Number.parseInt(data.id, 10);
+  const previewImage = imgUrl.replace(/'/g, "\\'");
+  const previewName = String(data.name || '').replace(/'/g, "\\'");
+  const intro = data.intro
+    ? `<p class="promo-intro">${data.intro.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</p>`
+    : '';
+  const discountBadge = discountPct
+    ? `<span class="promo-discount-badge">${escHtml(discountPct)}% ${i18n.t('promo_off', 'OFF')}</span>`
+    : '';
+  const title = safeTitle
+    ? `<div class="promo-title-tag">${safeTitle}</div>`
+    : '';
+  return `
+    ${intro}
+    <div class="promo-card">
+      <div class="promo-card-img" style="background-image:url('${safeImage}')" role="button" tabindex="0"
+        onclick="openProductPreview('${previewImage}', '${previewName}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openProductPreview('${previewImage}', '${previewName}');}">
+        ${discountBadge}
+      </div>
+      <div class="promo-card-info">
+        ${title}
+        <h3 class="promo-card-name" title="${safeName}">${safeName}</h3>
+        <div class="promo-card-price">${safePrice}</div>
+        ${safeDetails ? `<p class="promo-card-details">${safeDetails}</p>` : ''}
+        <button class="add-cart-btn" data-product-name="${safeName}" onclick="addCartClicked(this, ${productId})">
+          ${cartIcon + ' ' + i18n.t('add_btn', 'Add')}
+        </button>
+      </div>
+    </div>`;
 }
 
 const STATUS_CLASS = {
@@ -521,6 +590,20 @@ class GojoChat {
     await i18n.load(savedLang);
     i18n.applyToDOM();
     this._updateLangBtns(savedLang);
+    this._maybeShowFeaturedPromo();
+  }
+
+  async _maybeShowFeaturedPromo() {
+    try {
+      const res = await fetch(`/api/promotions/featured?lang=${encodeURIComponent(i18n.lang)}&user_id=${encodeURIComponent(this.userId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.promo && data.promo.card) {
+        await this._appendBotWithDelay(data.promo.card, 300, false);
+      }
+    } catch (e) {
+      console.warn('Featured promo load error:', e);
+    }
   }
 
   _updateLangBtns(lang) {
@@ -707,8 +790,9 @@ class GojoChat {
     const row = document.createElement('div');
     const isProducts = isProductCard(text);
     const isSupport = isSupportCard(text);
-    row.className = 'msg-row bot' + (isProducts ? ' wide' : '');
-    const useTypewriter = typewriter && !isProducts && !isOrderCard(text) && !isSupport;
+    const isPromo = isPromoCard(text);
+    row.className = 'msg-row bot' + (isProducts || isPromo ? ' wide' : '');
+    const useTypewriter = typewriter && !isProducts && !isOrderCard(text) && !isSupport && !isPromo;
     let inner = '';
     if (isSupport) {
       inner = renderSupportCard(parseSupportCard(text));
@@ -719,6 +803,8 @@ class GojoChat {
       }, 600);
     } else if (isOrderCard(text)) {
       inner = renderOrderCard(parseOrderCard(text));
+    } else if (isPromo) {
+      inner = renderPromoCard(parsePromoCard(text));
     } else if (isProducts) {
       inner = renderProductGrid(parseProductCard(text));
     } else {
@@ -773,6 +859,12 @@ window.gojoChatInstance = new GojoChat();
 window.applyProductFilter = (suffix) => {
   const chat = window.gojoChatInstance;
   chat.input.value = `${chat.lastProductQuery || 'products'}${suffix}`;
+  chat.send();
+};
+
+window.showMoreProducts = () => {
+  const chat = window.gojoChatInstance;
+  chat.input.value = 'show more';
   chat.send();
 };
 

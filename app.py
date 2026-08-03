@@ -271,6 +271,67 @@ def get_faq():
     return jsonify(chatbot.faq_data)
 
 
+@app.route('/api/promotions', methods=['GET'])
+def list_promotions():
+    """List all promotions (with status + product info) for the marketing dashboard."""
+    return jsonify({'promotions': chatbot.promotion_service.list_all()})
+
+
+@app.route('/api/promotions', methods=['POST'])
+def create_promotion():
+    """Create a new promotion campaign."""
+    data = request.get_json(silent=True) or {}
+    if not data.get('product_id'):
+        return jsonify({'error': 'product_id is required'}), 400
+    promo = chatbot.promotion_service.create(data)
+    if not promo:
+        return jsonify({'error': 'Could not create promotion'}), 400
+    return jsonify({'promotion': promo}), 201
+
+
+@app.route('/api/promotions/<promo_id>', methods=['PATCH'])
+def update_promotion(promo_id):
+    """Update a promotion (title, message, discount, dates, active toggle)."""
+    data = request.get_json(silent=True) or {}
+    promo = chatbot.promotion_service.update(promo_id, data)
+    if not promo:
+        return jsonify({'error': 'Promotion not found'}), 404
+    return jsonify({'promotion': promo})
+
+
+@app.route('/api/promotions/<promo_id>', methods=['DELETE'])
+def delete_promotion(promo_id):
+    """Delete a promotion."""
+    if not chatbot.promotion_service.delete(promo_id):
+        return jsonify({'error': 'Promotion not found'}), 404
+    return jsonify({'message': 'Promotion deleted'})
+
+
+@app.route('/api/promotions/products', methods=['GET'])
+def search_promo_products():
+    """Product picker search for the marketing dashboard."""
+    q = (request.args.get('q') or '').strip()
+    limit = min(int(request.args.get('limit', 8)), 20)
+    if not q:
+        return jsonify({'products': []})
+    products = db.search_products(q, limit=limit)
+    return jsonify({'products': products})
+
+
+@app.route('/api/promotions/featured', methods=['GET'])
+def featured_promotion():
+    """Return the featured live promo card (localized) shown when chat opens."""
+    lang = request.args.get('lang', 'en')
+    user_id = request.args.get('user_id')
+    card = chatbot.featured_promo_card(lang)
+    if not card:
+        return jsonify({'promo': None})
+    if user_id:
+        chatbot._ensure_session(user_id)
+        chatbot.user_sessions[user_id].promo_aware = True
+    return jsonify({'promo': {'card': card}})
+
+
 @app.route('/api/health', methods=['GET'])
 def health():
     """Health check endpoint"""

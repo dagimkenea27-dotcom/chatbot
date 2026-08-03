@@ -47,5 +47,37 @@ class FAQService:
             "cancellation": {
                 "question": "Can I cancel my order?",
                 "answer": "You can cancel within 1 hour of placing the order, or before it ships. Contact us immediately at +251911234567 or support@gojoshop.et. Once shipped, you'll need to use our return process instead."
+            },
+            "stock": {
+                "question": "Is a product in stock?",
+                "answer": "Live stock levels are shown on each product card. In stock items ship within 1-2 business days. Out of stock items are usually restocked within 1-2 weeks."
+            },
+            "authenticity": {
+                "question": "Are your products genuine?",
+                "answer": "Yes! All products are 100% authentic, sourced directly from trusted manufacturers and authorized distributors. Every item includes original packaging and a genuine warranty."
+            },
+            "wholesale": {
+                "question": "Do you offer wholesale or bulk pricing?",
+                "answer": "Yes! We welcome bulk orders from shops, distributors and resellers. Bulk pricing starts at 10+ units. Email wholesale@gojoshop.et or call +251911234567 for a custom quote."
+            },
+            "gift": {
+                "question": "Do you offer gift wrapping?",
+                "answer": "Yes! Gift wrapping is available at checkout for 100 ETB, and gift cards start from 500 ETB. We can also deliver directly to the recipient with a personal message."
+            },
+            "invoice": {
+                "question": "Can I get an invoice or receipt?",
+                "answer": "A receipt is emailed after every order. Tax invoices are available on request with your TIN. For businesses we provide VAT invoices and delivery notes. Email support@gojoshop.et with your Order ID."
+            },
+            "order_change": {
+                "question": "Can I change my order after placing it?",
+                "answer": "You can change your delivery address within 2 hours of ordering, and adjust quantities or add items before the order is processed. Once processed or shipped, changes are not possible."
+            },
+            "international": {
+                "question": "Do you ship internationally?",
+                "answer": "Currently we ship within Ethiopia only. For international requests, contact international@gojoshop.et and we'll see what we can arrange."
+            },
+            "installment": {
+                "question": "Do you offer installment payments?",
+                "answer": "Yes, on select electronics and home appliances. Plans of 3, 6 or 12 months are available with a valid ID and a down payment starting at 20%."
             }
         }
