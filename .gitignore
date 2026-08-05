@@ -31,3 +31,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Json files
+
+chatbot/data/promotions.json
+
