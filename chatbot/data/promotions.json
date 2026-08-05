@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "promo-e8a0eb82",
+    "product_id": 5736,
+    "title": "Flash Sale",
+    "message": "test",
+    "discount": 30.0,
+    "start": "2026-08-05T12:09",
+    "end": "2026-08-18T12:10",
+    "active": true,
+    "created_at": "2026-08-05T12:10:03"
+  }
+]
