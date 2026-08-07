@@ -346,7 +346,7 @@ class DatabaseManager:
                         user = cur.fetchone()
                 except ValueError:
                     # 2. String user_id - check by guest email format
-                    guest_email = f"{user_id}@guest.gojo.et"
+                    guest_email = self._guest_email(user_id)
                     cur.execute("SELECT * FROM users WHERE email = %s LIMIT 1", (guest_email,))
                     user = cur.fetchone()
                 
@@ -366,12 +366,12 @@ class DatabaseManager:
                         cur.execute("SELECT * FROM users WHERE telegram_id = %s LIMIT 1", (num_id,))
                         user = cur.fetchone()
                     else:
-                        guest_email = f"{user_id}@guest.gojo.et"
+                        guest_email = self._guest_email(user_id)
                         phone = "0000000000"
                         cur.execute(
                             "INSERT INTO users (name, f_name, l_name, phone, email, password, is_active) "
                             "VALUES (%s, 'Guest', 'User', %s, %s, 'guest_pass', 1)",
-                            (user_id, phone, guest_email)
+                            (user_id[:80], phone, guest_email)
                         )
                         conn.commit()
                         cur.execute("SELECT * FROM users WHERE email = %s LIMIT 1", (guest_email,))
@@ -381,6 +381,12 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"get_or_create_user error: {e}")
             return None
+
+    @staticmethod
+    def _guest_email(user_id: str) -> str:
+        """Build a guest email that fits the users.email varchar(80) limit."""
+        key = str(user_id)[:60]  # 60 + len('@guest.gojo.et') == 75 <= 80
+        return f"{key}@guest.gojo.et"
 
     def add_item_to_cart(self, user_id: str, product_name: str, quantity: int = 1) -> bool:
         """
@@ -546,6 +552,177 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"clear_cart error: {e}")
             return False
+
+    def remove_item_from_cart(self, user_id: str, product_name: str) -> bool:
+        """Remove a single line item (matching ``product_name``) from the cart.
+
+        Deletes the whole line (all units) since this is a "I added it by
+        mistake" recovery action. Returns True when a line was removed.
+        """
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return False
+
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                # Exact name match first, then fuzzy LIKE.
+                cur.execute(
+                    "SELECT id FROM carts WHERE customer_id = %s AND name = %s LIMIT 1",
+                    (user["id"], product_name)
+                )
+                row = cur.fetchone()
+                if not row:
+                    cur.execute(
+                        "SELECT id FROM carts WHERE customer_id = %s "
+                        "AND name LIKE %s LIMIT 1",
+                        (user["id"], f"%{product_name}%")
+                    )
+                    row = cur.fetchone()
+
+                if not row:
+                    conn.close()
+                    return False
+
+                cur.execute("DELETE FROM carts WHERE id = %s", (row["id"],))
+                conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"remove_item_from_cart error: {e}")
+            return False
+
+    def create_order(self, user_id: str, checkout_data: dict) -> dict | None:
+        """
+        Create an order from the user's cart and persist it to the DB.
+
+        Inserts one row into ``orders`` plus one row into ``order_details`` per
+        cart item, then clears the cart. Returns a dict with order + customer
+        fields (enough to render an order card), or None on failure / empty cart.
+        """
+        import json
+        import random
+        import string
+        import time
+
+        user = self.get_or_create_user(user_id)
+        if not user:
+            return None
+
+        customer_id = user["id"]
+        is_guest = 1 if not str(user_id).isdigit() else 0
+
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, product_id, name, quantity, price, slug, thumbnail, "
+                    "seller_id, seller_is FROM carts WHERE customer_id = %s",
+                    (customer_id,)
+                )
+                cart_items = cur.fetchall()
+                if not cart_items:
+                    conn.close()
+                    return None
+
+                order_amount = sum(
+                    float(it["price"]) * int(it["quantity"]) for it in cart_items
+                )
+
+                rand_suffix = "".join(random.choices(string.ascii_letters, k=5))
+                timestamp = int(time.time())
+                order_group_id = f"{customer_id}-{rand_suffix}-{timestamp}"
+
+                name = (checkout_data.get("name") or "").strip()
+                phone = (checkout_data.get("phone") or "").strip()
+                address = (checkout_data.get("address") or "").strip()
+                payment_method = (checkout_data.get("payment_method")
+                                  or "Cash on Delivery").strip()
+                city = (checkout_data.get("city") or "").strip()
+
+                addr_data = {
+                    "name": name,
+                    "address": address,
+                    "city": city,
+                    "country": "Ethiopia",
+                    "phone": phone,
+                }
+
+                cur.execute(
+                    """
+                    INSERT INTO orders
+                        (customer_id, is_guest, customer_type, payment_status,
+                         order_status, payment_method, order_amount,
+                         shipping_address, shipping_address_data, customer_phone,
+                         order_group_id, seller_is, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    """,
+                    (
+                        str(customer_id), is_guest,
+                        "guest" if is_guest else "customer",
+                        "unpaid", "pending", payment_method, order_amount,
+                        address, json.dumps(addr_data), phone,
+                        order_group_id, "admin",
+                    )
+                )
+                order_id = cur.lastrowid
+
+                for it in cart_items:
+                    product_details = json.dumps({
+                        "id": it["product_id"],
+                        "name": it["name"],
+                        "slug": it["slug"],
+                        "thumbnail": it["thumbnail"],
+                        "unit_price": it["price"],
+                    }, ensure_ascii=False)
+                    cur.execute(
+                        """
+                        INSERT INTO order_details
+                            (order_id, product_id, seller_id, product_details,
+                             qty, price, tax, discount, tax_model,
+                             delivery_status, payment_status, refund_request,
+                             created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, 0, 0, 'exclude',
+                                'pending', 'unpaid', '0', NOW(), NOW())
+                        """,
+                        (
+                            order_id, it["product_id"], it["seller_id"],
+                            product_details, it["quantity"], it["price"],
+                        )
+                    )
+
+                cur.execute("DELETE FROM carts WHERE customer_id = %s", (customer_id,))
+
+                # Align the users row with real checkout data so order lookups
+                # (which JOIN users.name) show the actual customer, not the guest id.
+                if name:
+                    f_name, _, l_name = name.partition(" ")
+                    cur.execute(
+                        "UPDATE users SET name = %s, f_name = %s, l_name = %s, "
+                        "phone = %s, city = %s, street_address = %s, updated_at = NOW() "
+                        "WHERE id = %s",
+                        (name[:80], (f_name or "Guest")[:255], (l_name or "User")[:255],
+                         (phone or "0000000000")[:25], city[:50], address[:250], customer_id)
+                    )
+                conn.commit()
+            conn.close()
+
+            return {
+                "id": order_id,
+                "order_id": str(order_id),
+                "order_amount": order_amount,
+                "order_status": "pending",
+                "payment_method": payment_method,
+                "payment_status": "unpaid",
+                "order_group_id": order_group_id,
+                "customer_phone": phone,
+                "shipping_address_data": json.dumps(addr_data),
+                "customer_name": name or user.get("name") or "Customer",
+                "seller_is": "admin",
+            }
+        except Exception as e:
+            logger.error(f"create_order error: {e}")
+            return None
 
     def get_user_session(self, user_id: str) -> dict | None:
         """Fetch session data from database."""

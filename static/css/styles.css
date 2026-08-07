@@ -68,6 +68,107 @@ body {
   position: relative;
 }
 
+body.chat-closed .chat-wrap {
+  transform: translateY(16px) scale(0.98);
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.chat-open .chat-wrap {
+  transform: none;
+  opacity: 1;
+}
+
+.chat-wrap {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+}
+
+/* Floating chat bubble launcher */
+.chat-bubble {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(145deg, #047857, #10b981);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  z-index: 1000;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+}
+
+.chat-bubble:hover {
+  transform: scale(1.06);
+  box-shadow: 0 14px 38px rgba(16, 185, 129, 0.55);
+}
+
+.chat-bubble:active {
+  transform: scale(0.96);
+}
+
+.chat-bubble-icon {
+  width: 28px;
+  height: 28px;
+  transition: opacity 0.18s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-bubble-icon-close {
+  position: absolute;
+  opacity: 0;
+  transform: scale(0.4) rotate(-90deg);
+}
+
+body.chat-closed .chat-bubble-icon-open {
+  transform: scale(1);
+}
+
+body.chat-open .chat-bubble-icon-open {
+  opacity: 0;
+  transform: scale(0.4) rotate(90deg);
+}
+
+body.chat-open .chat-bubble-icon-close {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.chat-bubble-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  animation: count-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes count-pop {
+  from {
+    transform: scale(0.4);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
 /* Header */
 .chat-header {
   padding: 16px 20px;
@@ -162,6 +263,43 @@ body {
 .header-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* Cart icon with count badge */
+.cart-btn {
+  position: relative;
+}
+
+.cart-btn:hover {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.cart-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #10b981;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  animation: count-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cart-btn svg {
+  width: 17px;
+  height: 17px;
 }
 
 /* Language selector */
@@ -477,6 +615,147 @@ body.lang-am .feature-item {
   border-radius: 20px;
   font-size: 11.5px;
   font-weight: 600;
+}
+
+.checkout-card {
+  background: linear-gradient(135deg, #f0fdf4, #ffffff);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(4, 120, 87, 0.06);
+}
+
+.checkout-card-header {
+  margin-bottom: 10px;
+}
+
+.checkout-badge {
+  font-weight: 700;
+  color: #047857;
+  font-size: 13.5px;
+}
+
+.checkout-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(4, 120, 87, 0.18);
+}
+
+.checkout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkout-row span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.checkout-row b {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.checkout-items {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkout-items li {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(4, 120, 87, 0.08);
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cart-item-row span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cart-remove-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.cart-remove-btn:hover:not(:disabled) {
+  background: var(--red);
+  color: #fff;
+}
+
+.cart-remove-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.cart-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cart-msg {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+
+.checkout-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.checkout-total b {
+  font-weight: 700;
+  color: #047857;
+}
+
+.checkout-prompt {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  line-height: 1.5;
+  font-size: 12.5px;
 }
 
 .status-delivered {
@@ -1339,6 +1618,10 @@ body.lang-am .feature-item {
     box-shadow: none;
   }
 
+  body.chat-open .chat-bubble {
+    display: none;
+  }
+
   .feature-grid {
     grid-template-columns: 1fr;
   }
@@ -1488,4 +1771,19 @@ body.lang-am .feature-item {
   padding: 8px;
   border-radius: 8px;
   text-align: center;
+}
+
+/* Checkout link in feature list */
+.checkout-link {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, text-underline-offset 0.2s;
+}
+
+.checkout-link:hover {
+  color: var(--accent);
+  text-underline-offset: 4px;
 }

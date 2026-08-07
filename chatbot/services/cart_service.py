@@ -26,6 +26,16 @@ class CartService:
                 print(f"Error adding to cart: {e}")
                 return False
         return False
+
+    def remove_item(self, user_id: str, product: str) -> bool:
+        """Remove an item (whole line) from the user's cart."""
+        if self.db and hasattr(self.db, "remove_item_from_cart"):
+            try:
+                return self.db.remove_item_from_cart(user_id, product)
+            except Exception as e:
+                print(f"Error removing from cart: {e}")
+                return False
+        return False
     
     def clear_cart(self, user_id: str) -> bool:
         """Clear user's cart."""

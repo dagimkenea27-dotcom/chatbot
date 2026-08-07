@@ -927,6 +927,7 @@ function promoThumb(thumbnail, name) {
 /* ── State ── */
 let promoSelectedProduct = null;
 let promoSearchTimer = null;
+let editingPromoId = null;
 
 const promoProductSearch = document.getElementById('promoProductSearch');
 const promoProductResults = document.getElementById('promoProductResults');
@@ -1012,7 +1013,7 @@ function updatePromoPreview() {
   document.getElementById(id).addEventListener('input', updatePromoPreview);
 });
 
-/* ── Create promotion ── */
+/* ── Create / update promotion ── */
 document.getElementById('promoCreateBtn').addEventListener('click', async () => {
   if (!promoSelectedProduct) { toast('⚠️ Select a product first'); return; }
   const btn = document.getElementById('promoCreateBtn');
@@ -1027,24 +1028,29 @@ document.getElementById('promoCreateBtn').addEventListener('click', async () => 
       end: document.getElementById('promoEnd').value,
       active: true
     };
-    const res = await fetch('/api/promotions', {
-      method: 'POST',
+    const url = editingPromoId
+      ? '/api/promotions/' + encodeURIComponent(editingPromoId)
+      : '/api/promotions';
+    const method = editingPromoId ? 'PATCH' : 'POST';
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error('Create failed');
-    toast('✅ Promotion launched!');
+    if (!res.ok) throw new Error('Save failed');
+    toast(editingPromoId ? '✅ Promotion updated' : '✅ Promotion launched!');
     resetPromoForm();
     await loadPromotions();
   } catch (e) {
     console.error(e);
-    toast('⚠️ Could not create promotion');
+    toast('⚠️ Could not save promotion');
   } finally {
     btn.disabled = false;
   }
 });
 
 function resetPromoForm() {
+  editingPromoId = null;
   promoSelectedProduct = null;
   document.getElementById('promoSelected').style.display = 'none';
   document.getElementById('promoTitle').value = '';
@@ -1052,6 +1058,29 @@ function resetPromoForm() {
   document.getElementById('promoDiscount').value = 0;
   document.getElementById('promoStart').value = '';
   document.getElementById('promoEnd').value = '';
+  document.getElementById('promoCreateBtn').textContent = '🚀 Launch promotion';
+  updatePromoPreview();
+}
+
+function fillPromoForm(p) {
+  editingPromoId = p.id;
+  const product = p.product || {};
+  promoSelectedProduct = {
+    id: p.product_id,
+    name: product.name || 'Product #' + p.product_id,
+    price: product.unit_price || product.price || 0,
+    thumb: product.thumbnail || ''
+  };
+  document.getElementById('promoSelectedName').textContent = promoSelectedProduct.name;
+  document.getElementById('promoSelectedPrice').textContent = Number(promoSelectedProduct.price || 0).toLocaleString() + ' ETB';
+  document.getElementById('promoSelectedThumb').style.backgroundImage = `url('${promoThumb(promoSelectedProduct.thumb, promoSelectedProduct.name)}')`;
+  document.getElementById('promoSelected').style.display = 'flex';
+  document.getElementById('promoTitle').value = p.title || '';
+  document.getElementById('promoMessage').value = p.message || '';
+  document.getElementById('promoDiscount').value = Number(p.discount) || 0;
+  document.getElementById('promoStart').value = p.start || '';
+  document.getElementById('promoEnd').value = p.end || '';
+  document.getElementById('promoCreateBtn').textContent = '💾 Save changes';
   updatePromoPreview();
 }
 
@@ -1107,6 +1136,7 @@ function renderPromotions(list) {
           ${isLive
             ? `<button class="mkt-mini-btn pause" data-action="toggle" data-id="${esc(p.id)}" data-active="false">Pause</button>`
             : `<button class="mkt-mini-btn green" data-action="toggle" data-id="${esc(p.id)}" data-active="true">Activate</button>`}
+          <button class="mkt-mini-btn" data-action="edit" data-id="${esc(p.id)}">Edit</button>
           <button class="mkt-mini-btn danger" data-action="delete" data-id="${esc(p.id)}">Delete</button>
         </div>
       </div>`;
@@ -1117,6 +1147,10 @@ function renderPromotions(list) {
       const id = btn.dataset.id;
       if (btn.dataset.action === 'toggle') {
         updatePromoActive(id, btn.dataset.active === 'true');
+      } else if (btn.dataset.action === 'edit') {
+        const promo = list.find(p => p.id === id);
+        if (promo) fillPromoForm(promo);
+        document.querySelector('.mkt-form-col').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (btn.dataset.action === 'delete') {
         if (confirm('Delete this promotion?')) deletePromotion(id);
       }
@@ -1145,6 +1179,7 @@ async function deletePromotion(id) {
     const res = await fetch('/api/promotions/' + encodeURIComponent(id), { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
     toast('🗑 Promotion deleted');
+    if (editingPromoId === id) resetPromoForm();
     await loadPromotions();
   } catch (e) {
     console.error(e);

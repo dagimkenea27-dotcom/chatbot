@@ -113,6 +113,27 @@ class TestPromotionService(unittest.TestCase):
         self.assertEqual(len(self.service.get_active()), 1)
         self.assertEqual(self.service.get_status(promo), "active")
 
+    def test_reloads_after_external_file_change(self):
+        self._create_active()
+        self.assertEqual(len(self.service.get_active()), 1)
+
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump([], f)
+
+        self.assertEqual(self.service.list_all(), [])
+        self.assertEqual(self.service.get_active(), [])
+        self.assertIsNone(self.service.get_featured())
+
+    def test_delete_clears_file_and_in_memory(self):
+        promo = self._create_active()
+        self.assertTrue(self.service.delete(promo["id"]))
+
+        with open(self.path, "r", encoding="utf-8") as f:
+            self.assertEqual(json.load(f), [])
+
+        self.assertEqual(self.service.list_all(), [])
+        self.assertIsNone(self.service.get_featured())
+
     def test_get_featured_resolves_product(self):
         self._create_active()
         featured = self.service.get_featured()

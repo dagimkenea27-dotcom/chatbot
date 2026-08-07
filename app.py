@@ -33,10 +33,7 @@ else:
 
 @app.route('/')
 def index():
-    try:
-        return render_template('index.html')
-    except Exception:
-        return render_template('chatbot.html')
+    return render_template('chatbot.html')
 
 
 @app.route('/favicon.ico')
@@ -237,6 +234,20 @@ def get_cart_details(user_id):
     """Get cart with full pricing details and grand total"""
     if hasattr(db, 'get_cart_details'):
         details = db.get_cart_details(user_id)
+        # Enrich any item whose price failed to resolve so the cart UI never
+        # shows blank prices (e.g. when get_cart_details degrades on the live DB).
+        for it in details.get('items') or []:
+            if not it.get('price') and (it.get('name')):
+                it['price'] = chatbot._lookup_product_price(it['name'])
+                it['subtotal'] = float(it['price']) * int(it.get('quantity') or 1)
+        if not details.get('items') and chatbot.get_cart(user_id):
+            details['items'] = [
+                {'name': n, 'quantity': 1,
+                 'price': chatbot._lookup_product_price(n),
+                 'subtotal': chatbot._lookup_product_price(n)}
+                for n in chatbot.get_cart(user_id)
+            ]
+            details['total_price'] = sum(i['subtotal'] for i in details['items'])
         return jsonify(details)
     # Fallback: plain list
     cart = chatbot.get_cart(user_id)
@@ -257,6 +268,45 @@ def clear_cart():
         chatbot._ensure_session(user_id)
         chatbot.user_sessions[user_id]['cart'] = []
     return jsonify({'message': 'Cart cleared', 'user_id': user_id})
+
+
+@app.route('/api/cart/remove', methods=['POST'])
+def remove_cart_item():
+    """Remove a single item the user added by mistake."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    product = data.get('product')
+    if not user_id or not product:
+        return jsonify({'error': 'user_id and product are required'}), 400
+
+    removed = chatbot.remove_from_cart(user_id, product)
+    cart_count = len(chatbot.get_cart(user_id))
+    return jsonify({
+        'message': 'Removed' if removed else 'Product not in cart',
+        'removed': bool(removed),
+        'cart_count': cart_count,
+    })
+
+
+@app.route('/api/checkout', methods=['POST'])
+def place_checkout_order():
+    """Programmatic checkout fallback: place an order from the user's cart."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
+    checkout_data = {
+        'name': data.get('name') or '',
+        'phone': data.get('phone') or '',
+        'address': data.get('address') or '',
+        'city': data.get('city') or '',
+        'payment_method': data.get('payment_method') or 'Cash on Delivery',
+    }
+    order = chatbot.create_order_from_cart(user_id, checkout_data)
+    if not order:
+        return jsonify({'error': 'Could not place order (empty cart or store offline)'}), 400
+    return jsonify({'order': order}), 201
 
 
 @app.route('/api/products', methods=['GET'])

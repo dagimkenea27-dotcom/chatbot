@@ -23,6 +23,7 @@ class PromotionService:
             "data", "promotions.json",
         )
         self.promotions: List[Dict] = []
+        self._last_mtime: Optional[float] = None
         self.load()
 
     # ── Persistence ─────────────────────────────────────────────
@@ -31,15 +32,31 @@ class PromotionService:
             with open(self.path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.promotions = data if isinstance(data, list) else []
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self._last_mtime = os.path.getmtime(self.path)
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
             print(f"PromotionService: could not load {self.path}: {e}")
             self.promotions = []
         return self.promotions
 
-    def save(self) -> bool:
+    def _reload_if_changed(self) -> None:
+        """Reload the JSON file if it changed on disk (another worker/process
+        may have written it). Keeps delete/update consistent across processes."""
         try:
-            with open(self.path, "w", encoding="utf-8") as f:
+            mtime = os.path.getmtime(self.path)
+        except OSError:
+            return
+        if mtime != self._last_mtime:
+            self.load()
+
+    def save(self) -> bool:
+        """Atomically persist promotions so a crash or concurrent reader never
+        sees a half-written file."""
+        try:
+            tmp_path = self.path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self.promotions, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, self.path)
+            self._last_mtime = os.path.getmtime(self.path)
             return True
         except Exception as e:
             print(f"PromotionService: could not save {self.path}: {e}")
@@ -80,6 +97,7 @@ class PromotionService:
 
     def list_all(self) -> List[Dict]:
         """Return every promotion with a computed status label."""
+        self._reload_if_changed()
         now = self._now()
         out = []
         for promo in self.promotions:
@@ -102,12 +120,14 @@ class PromotionService:
         return "active"
 
     def get(self, promo_id: str) -> Optional[Dict]:
+        self._reload_if_changed()
         for promo in self.promotions:
             if promo.get("id") == promo_id:
                 return promo
         return None
 
     def get_active(self, now: Optional[datetime] = None) -> List[Dict]:
+        self._reload_if_changed()
         return [p for p in self.promotions
                 if p.get("active") and self._window_open(p, now)]
 
@@ -130,6 +150,7 @@ class PromotionService:
 
     # ── CRUD ─────────────────────────────────────────────────────
     def create(self, data: Dict) -> Optional[Dict]:
+        self._reload_if_changed()
         product_id = data.get("product_id")
         if product_id in (None, ""):
             return None
@@ -145,10 +166,13 @@ class PromotionService:
             "created_at": self._now().isoformat(timespec="seconds"),
         }
         self.promotions.append(promo)
-        self.save()
+        if not self.save():
+            self.load()
+            return None
         return dict(promo)
 
     def update(self, promo_id: str, data: Dict) -> Optional[Dict]:
+        self._reload_if_changed()
         promo = self.get(promo_id)
         if not promo:
             return None
@@ -161,15 +185,20 @@ class PromotionService:
             promo["discount"] = self._coerce_number(data["discount"], promo.get("discount", 0))
         if "active" in data:
             promo["active"] = bool(data["active"])
-        self.save()
+        if not self.save():
+            self.load()
+            return None
         return dict(promo)
 
     def delete(self, promo_id: str) -> bool:
+        self._reload_if_changed()
         before = len(self.promotions)
         self.promotions = [p for p in self.promotions if p.get("id") != promo_id]
         if len(self.promotions) == before:
             return False
-        self.save()
+        if not self.save():
+            self.load()
+            return False
         return True
 
     @staticmethod

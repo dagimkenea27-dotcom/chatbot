@@ -116,6 +116,9 @@ PRODUCT_INDICATORS: Tuple[str, ...] = (
     "ግዛ", "ፈልግ", "አሳይ", "ዋጋ", "ምርት",
     # transliterated Amharic
     "felge", "mayet", "megzat", "waga", "giza", "miret",
+    # conjugated Amharic (verbs in suffix forms break substring matching)
+    "ፈልጌ ነበር", "ፈልጌ", "አሳየኝ", "አሳይኝ", "ግዛኝ",
+    "felige neber", "felige", "asayen", "gizene",
 )
 
 #: Words that trigger an explicit product search.
@@ -126,6 +129,9 @@ PRODUCT_ACTION_TERMS: Tuple[str, ...] = (
     "ግዛ", "ፈልግ", "አሳይ", "እፈልጋለሁ", "ምርት", "መግዛት",
     # transliterated Amharic
     "felge", "mayet", "megzat", "giza", "efeligalehu", "waga", "asay",
+    # conjugated Amharic (verbs in suffix forms break substring matching)
+    "ፈልጌ ነበር", "ፈልጌ", "አሳየኝ", "አሳይኝ", "ግዛኝ",
+    "felige neber", "felige", "asayen", "gizene",
 )
 
 #: Fallback product-name hints when no EntityExtractor is available.
@@ -307,6 +313,18 @@ SMALL_TALK_PHRASES: Tuple[str, ...] = (
 SHOPPING_TERMS: Tuple[str, ...] = (
     "buy", "purchase", "order", "price", "shop", "ምርት", "ግዛ", "ፈልግ", "አሳይ",
     "megzat", "felge", "waga",
+)
+
+#: Phrases requesting removal of an item from the cart.
+CART_REMOVE_TERMS: Tuple[str, ...] = (
+    "remove from cart", "remove from my cart", "remove from the cart",
+    "remove it", "remove this", "remove", "delete from cart", "delete it",
+    "delete this", "delete", "take it out", "take out", "get rid of",
+    "remove item", "remove product",
+    # Amharic
+    "ከጋሪ", "አስወግድ", "አስወግደኝ", "አጥፋ", "አውርድ",
+    # transliterated Amharic
+    "kegari", "aswegid", "aswegiden", "atfa", "awred",
 )
 
 #: Compiled patterns used by :meth:`IntentDetector.references_last_item`.
@@ -522,6 +540,16 @@ class IntentDetector:
         if self.is_small_talk(msg):
             return IntentResult("small_talk", self.MEDIUM,
                                 reasons=["small_talk"])
+
+        # 14.5 Cart display ("cart", "show cart", "my cart") ---------------------
+        if self._detect_show_cart(msg):
+            return IntentResult("show_cart", self.HIGH,
+                                reasons=["show_cart"])
+
+        # 14.6 Cart item removal -----------------------------------------------
+        if self._detect_cart_remove(msg):
+            return IntentResult("remove_from_cart", self.HIGH,
+                                reasons=["cart_remove"])
 
         # 15. Product search (explicit wording or name-only) -----------------------
         if _contains_any(msg, PRODUCT_ACTION_TERMS) or self._is_product_query(msg):
@@ -773,6 +801,30 @@ class IntentDetector:
         if self.entity_extractor is not None:
             return bool(self.entity_extractor.extract_search_keyword(msg))
         return False
+
+    def _detect_show_cart(self, msg: str) -> bool:
+        """True when the user wants to view their cart (not add to it)."""
+        if not msg:
+            return False
+        # Explicit "add/put to cart" or "remove from cart" are different
+        # actions — never show.
+        if _contains_any(msg, ("add", "put", "buy", "purchase", "get",
+                               "ጨምር", "አክል", "ግዛ", "chemere", "akel", "giza",
+                               "remove", "delete", "take out", "አስወግድ",
+                               "አጥፋ", "aswegid", "atfa")):
+            return False
+        return _contains_any(msg, (
+            "cart", "my cart", "cart items", "shopping cart", "show cart",
+            "view cart", "see cart", "what's in my cart", "whats in my cart",
+            # Amharic
+            "ጋሪ", "ጋሪዬ", "ጋሪ አሳይ", "ጋሪዬን አሳይ", "ሳጥን",
+            # transliterated Amharic
+            "gari asay", "gariye asay", "gar",
+        ))
+
+    def _detect_cart_remove(self, msg: str) -> bool:
+        """True when the user wants to remove an item from their cart."""
+        return _contains_any(msg, CART_REMOVE_TERMS)
 
     # ====================================================================
     # Answer helpers

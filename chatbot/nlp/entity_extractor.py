@@ -90,8 +90,13 @@ class EntityExtractor:
             r"i want to buy|want to buy|i want to get|i would like|i'd like|would like|"
             r"i want|want to buy|i need to buy|need to buy|do you have|can i get|"
             r"i need|need|buy|get me|recommend|tell me about|what about|show me some|"
-            r"ፈልግ|አሳይ|እፈልጋለሁ|ግዛ|መግዛት|felge|asay|efeligalehu|giza|megzat|mayet)\s+",
+            r"ፈልጌ ነበር|ፈልጌ|እፈልጋለሁ|አሳየኝ|አሳይኝ|ግዛኝ|ፈልግ|አሳይ|ግዛ|መግዛት|ማግኘት|"
+            r"felige neber|efeligalehu|asayen|gizene|felge|asay|giza|megzat|mayet)\s*",
             r"\s+(please|pls|now|today|asap|right now)$",
+            # Amharic places conjugated verbs at the end of the sentence
+            # ("አይፎን ፈልጌ ነበር") so strip them from the tail too.
+            r"\s+(ፈልጌ ነበር|ፈልጌ|እፈልጋለሁ|አሳየኝ|አሳይኝ|ግዛኝ|ፈልግ|አሳይ|ግዛ|መግዛት|ማግኘት|"
+            r"felige neber|efeligalehu|asayen|gizene|felge|asay|giza|megzat|mayet)\s*$",
             r"\b(a|an|the|some|any)\b\s*",
         ]
         kw = message_lower
@@ -109,6 +114,48 @@ class EntityExtractor:
         ).strip()
         kw = re.sub(r"\s{2,}", " ", kw).strip()
         
+        if len(kw) >= 2 and not kw.isdigit():
+            return kw
+        return None
+    
+    def extract_remove_keyword(self, message: str) -> Optional[str]:
+        """Extract the product name a user wants removed from their cart.
+
+        Strips removal phrases (English, Amharic, transliterated) anywhere in
+        the message, e.g. "remove iPhone 15 from my cart" -> "iphone 15".
+        Bare reference words ("it", "last", ...) yield ``None`` so the caller
+        can fall back to "remove the last item" or ask which item.
+        """
+        kw = message.lower().strip()
+        if not kw:
+            return None
+
+        remove_phrases = [
+            # English
+            r"remove from my cart", r"remove from the cart", r"remove from cart",
+            r"remove from cart", r"remove from my cart", r"remove it",
+            r"remove this", r"remove", r"delete from my cart",
+            r"delete from the cart", r"delete from cart", r"delete it",
+            r"delete this", r"delete", r"take out of my cart",
+            r"take out of the cart", r"take out of cart", r"take out",
+            r"take it out", r"get rid of", r"get rid", r"from my cart",
+            r"from the cart", r"from cart", r"my cart", r"the cart",
+            # Amharic
+            r"ከጋሪዬ", r"ከጋሪ", r"አስወግደኝ", r"አስወግድ", r"አጥፋ", r"አውርድ",
+            # transliterated Amharic
+            r"kegariye", r"kegari", r"aswegiden", r"aswegid", r"atfa",
+            r"awred", r"siyawel",
+        ]
+        for phrase in remove_phrases:
+            kw = re.sub(rf"\s*{phrase}\s*", " ", kw)
+        kw = re.sub(r"\s{2,}", " ", kw).strip()
+
+        if kw.lower() in {"it", "that", "this", "one", "them", "these",
+                          "last", "last one", "last item", "last thing",
+                          "the last", "the last one", "the last item",
+                          "the last thing", "that one", "this one",
+                          "that last one", "the one"}:
+            return None
         if len(kw) >= 2 and not kw.isdigit():
             return kw
         return None

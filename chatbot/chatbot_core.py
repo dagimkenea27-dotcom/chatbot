@@ -17,6 +17,7 @@ from chatbot.services.promotion_service import PromotionService
 from chatbot.nlp.intent_detector import IntentDetector
 from chatbot.nlp.entity_extractor import EntityExtractor
 from chatbot.nlp.sentiment import SentimentAnalyzer
+from chatbot.nlp.transliteration import normalize_transliteration, to_latin
 from chatbot.models.memory import ConversationMemory
 from chatbot.utils.typing import calc_typing_delay
 
@@ -81,6 +82,26 @@ class GojoShopChatbot:
             session.cart.append(product_name)
         return f"Added {product_name} to cart"
 
+    def remove_from_cart(self, user_id: str, product_name: str) -> bool:
+        """Remove a product the user added by mistake. Returns True if removed."""
+        removed = self.cart_service.remove_item(user_id, product_name)
+        session = self.session_service.get_session(user_id)
+        session.cart = [n for n in session.cart if n != product_name]
+        return removed
+
+    def create_order_from_cart(self, user_id: str, checkout_data: dict) -> Optional[Dict]:
+        """Programmatic order placement from a cart (API fallback)."""
+        if self.db is None or not hasattr(self.db, "create_order"):
+            return None
+        order = self.db.create_order(user_id, checkout_data)
+        if not order:
+            return None
+        session = self.session_service.get_session(user_id)
+        order_id = order.get("id") or order.get("order_id")
+        session.last_order_id = order_id
+        session.cart = []
+        return order
+
     def list_support_requests(self, limit: int = 50) -> List[Dict]:
         if self.db and hasattr(self.db, "list_support_requests"):
             try:
@@ -118,6 +139,13 @@ class GojoShopChatbot:
         # Get session
         session = self.session_service.get_session(user_id)
         
+        # Normalize transliterated Amharic (Latin script) to Ethiopic so the
+        # NLP pipeline (language switch, intents, keyword extraction) can
+        # understand Ethiopian users typing in Latin letters ("felige neber"
+        # for "ፈልጌ ነበር"). The raw message is kept for history / support.
+        raw_message = message
+        message = normalize_transliteration(message)
+        
         # Get conversation context
         conv_context = self.conversation_memory.get_context(user_id)
         conv_context.session = session
@@ -138,9 +166,9 @@ class GojoShopChatbot:
             session.conversation_topics = session.conversation_topics[-20:]
         
         # Load cart
-        session.cart = self.cart_service.get_cart(user_id)
+        session.cart = self.get_cart(user_id)
         session.message_count += 1
-        self.session_service.record_turn(session, "user", message)
+        self.session_service.record_turn(session, "user", raw_message)
         
         # Track browsing history
         keyword = self.entity_extractor.extract_search_keyword(message)
@@ -153,7 +181,8 @@ class GojoShopChatbot:
             session.last_viewed_category = self.entity_extractor.categorize_keyword(keyword)
         
         # Name capture
-        if session.message_count <= 2 and not session.user_name:
+        if (session.message_count <= 2 and not session.user_name
+                and not getattr(session, "checkout_pending", False)):
             name = self.entity_extractor.extract_name(message)
             if name:
                 session.user_name = name
@@ -177,7 +206,7 @@ class GojoShopChatbot:
         # Check for active support request
         active_req = self.support_service.get_active_request(user_id)
         if active_req:
-            self.support_service.add_message(active_req['id'], "user", message)
+            self.support_service.add_message(active_req['id'], "user", raw_message)
             self.session_service.save_session(user_id)
             return "[SUPPORT_MODE]"
         
@@ -187,6 +216,14 @@ class GojoShopChatbot:
         )
         session.last_intent = session.current_intent
         session.current_intent = intent
+        
+        # ---- ACTIVE CHECKOUT FLOW ----
+        # While the checkout state machine awaits input, route every reply to
+        # the checkout handler (except explicit escapes to a human / help).
+        if getattr(session, "checkout_pending", False) and intent not in (
+            "human_support", "help"
+        ):
+            intent = "checkout"
         
         # ---- CLARIFICATION ----
         clarification = self._generate_clarification(
@@ -314,6 +351,8 @@ class GojoShopChatbot:
             "loyalty": self._handle_loyalty,
             "cancellation": self._handle_cancellation,
             "checkout": self._handle_checkout,
+            "show_cart": self._handle_show_cart,
+            "remove_from_cart": self._handle_cart_remove,
             "stock": self._handle_stock,
             "authenticity": self._handle_authenticity,
             "wholesale": self._handle_wholesale,
@@ -509,6 +548,7 @@ class GojoShopChatbot:
         
         self.cart_service.add_item(session.user_id, product["name"])
         session.last_product = product
+        session.cart = self.get_cart(session.user_id)
         cart_count = len(session.cart)
         
         user_name = session.user_name or ""
@@ -526,6 +566,7 @@ class GojoShopChatbot:
             return self.translation_service.translate(session, "specify_product_id")
         
         self.cart_service.add_item(session.user_id, product["name"])
+        session.cart = self.get_cart(session.user_id)
         cart_count = len(session.cart)
         
         user_name = session.user_name or ""
@@ -700,11 +741,318 @@ class GojoShopChatbot:
                 f"• Once shipped, use our return process instead\n\n"
                 f"Would you like me to look up your order? 📦")
     
-    def _handle_checkout(self, message: str, session) -> str:
-        cart_items = self.cart_service.get_cart(session.user_id)
-        if not cart_items:
+    def _handle_show_cart(self, message: str, session) -> str:
+        """Render the user's cart as a ``[CART]`` card with items and total."""
+        items = self._load_cart_items(session)
+        if not items:
             return self.translation_service.translate(session, "checkout_empty")
-        return self.translation_service.translate(session, "checkout_count", cart_len=len(cart_items))
+
+        total = sum(sub for _, _, sub in items)
+        prompt = self.translation_service.translate(session, "cart_show_prompt")
+        return self._render_cart_card(items, total, prompt=prompt)
+
+    def _load_cart_items(self, session) -> List:
+        """Return cart items as ``[(name, qty, subtotal), ...]``.
+
+        Prefers live DB pricing via ``get_cart_details``. If the DB reports no
+        items, or any item has a zero subtotal, prices are resolved from the
+        product catalog so the cart card never shows blank prices.
+        """
+        items = []
+        if self.db is not None and hasattr(self.db, "get_cart_details"):
+            try:
+                details = self.db.get_cart_details(session.user_id)
+                for it in details.get("items") or []:
+                    subtotal = float(it.get("subtotal") or
+                                     (it.get("price", 0) * it.get("quantity", 1)))
+                    items.append((it.get("name") or "Item",
+                                  it.get("quantity", 1), subtotal))
+            except Exception:
+                items = []
+        if not items:
+            items = [(n, 1, self._lookup_product_price(n))
+                     for n in (session.cart or [])]
+        else:
+            items = [(n, q, s if s > 0 else self._lookup_product_price(n))
+                     for n, q, s in items]
+        return items
+
+    def _lookup_product_price(self, name: str) -> float:
+        """Best-effort live unit price for a cart item name (0.0 if unknown)."""
+        if self.db is not None and hasattr(self.db, "search_products"):
+            try:
+                for p in self.db.search_products(name, limit=3) or []:
+                    if not p:
+                        continue
+                    pname = str(p.get("name") or "").lower()
+                    if pname and (pname == name.lower()
+                                  or pname.startswith(name.lower())
+                                  or name.lower() in pname):
+                        return float(p.get("unit_price") or p.get("price") or 0)
+            except Exception:
+                return 0.0
+        return 0.0
+
+    def _render_cart_card(self, items: List, total: float,
+                          prompt: Optional[str] = None,
+                          msg: Optional[str] = None) -> str:
+        """Build a ``[CART]`` card string (web + Telegram render it).
+
+        ``msg`` carries a one-line note (e.g. "Removed X") shown above the
+        card. Item lines use the ``Name × qty — price ETB`` format that the
+        web parser splits on ``" × "`` to recover the product name.
+        """
+        lines = []
+        if msg:
+            lines.append(f"Msg: {msg}")
+        lines.append("[CART]")
+        lines += [f"Item: {n} × {qty} — {price:,.2f} ETB" for n, qty, price in items]
+        lines.append(f"Total: {total:,.2f} ETB")
+        if prompt:
+            lines.append(f"Prompt: {prompt}")
+        return "\n".join(lines)
+
+    def _handle_cart_remove(self, message: str, session) -> str:
+        """Remove an item the user added by mistake, then re-show the cart."""
+        items = self._load_cart_items(session)
+        if not items:
+            return self.translation_service.translate(session, "cart_remove_empty")
+        total = sum(sub for _, _, sub in items)
+        prompt = self.translation_service.translate(session, "cart_show_prompt")
+
+        def _remove_and_rerender(name: str) -> str:
+            self.cart_service.remove_item(session.user_id, name)
+            session.cart = [n for n in session.cart if n != name]
+            new_items = self._load_cart_items(session)
+            new_total = sum(sub for _, _, sub in new_items)
+            msg = self.translation_service.translate(
+                session, "cart_remove_success", product=name)
+            if not new_items:
+                return msg
+            return self._render_cart_card(new_items, new_total,
+                                          prompt=prompt, msg=msg)
+
+        kw = self.entity_extractor.extract_remove_keyword(message)
+        if kw:
+            kw_latin = to_latin(kw).lower()
+            target = None
+            for name, qty, sub in items:
+                name_latin = to_latin(name).lower()
+                if (name.lower() == kw.lower()
+                        or kw.lower() in name.lower()
+                        or name.lower() in kw.lower()
+                        or (kw_latin and name_latin
+                            and (name_latin == kw_latin
+                                 or kw_latin in name_latin
+                                 or name_latin in kw_latin))):
+                    target = name
+                    break
+            if target:
+                return _remove_and_rerender(target)
+            return self.translation_service.translate(
+                session, "cart_remove_not_found", product=kw)
+
+        # No explicit product name — a reference word removes the last item.
+        if any(w in message.lower() for w in ("last", "it", "one", "this",
+                                              "በመጨረሻ", "እሱ", "ይህ")):
+            return _remove_and_rerender(items[-1][0])
+
+        names = "\n".join(f"• {n}" for n, _, _ in items)
+        return self.translation_service.translate(
+            session, "cart_remove_prompt", items=names)
+
+    def _handle_checkout(self, message: str, session) -> str:
+        """Multi-step in-chat checkout state machine.
+
+        Steps: name → phone → address → payment → review/confirm → create order.
+        State lives on the session (``checkout_state`` / ``checkout_step`` /
+        ``checkout_data`` / ``checkout_pending``) so it survives across turns.
+        """
+        cart_items = self.cart_service.get_cart(session.user_id) or session.cart
+        if not cart_items:
+            self._reset_checkout(session)
+            return self.translation_service.translate(session, "checkout_empty")
+
+        msg = message.strip()
+        msg_lower = msg.lower()
+
+        # ---- Cancel / escape commands (any stage) -----------------------
+        if self._is_checkout_cancel(msg_lower):
+            self._reset_checkout(session)
+            return self.translation_service.translate(session, "checkout_cancelled")
+
+        # ---- Fresh start -------------------------------------------------
+        if not session.checkout_pending:
+            session.checkout_state = "details"
+            session.checkout_pending = True
+            session.checkout_step = 0
+            session.checkout_data = {}
+            if session.user_name:
+                session.checkout_data["name"] = session.user_name
+                session.checkout_step = 1
+                return self.translation_service.translate(
+                    session, "checkout_ask_phone", name=session.user_name
+                )
+            return self.translation_service.translate(session, "checkout_ask_name")
+
+        # ---- Confirm stage: yes/no/retry ---------------------------------
+        if session.checkout_state == "confirm":
+            if self.intent_detector.is_affirmative(msg):
+                return self._place_order(session)
+            if self.intent_detector.is_negative(msg):
+                self._reset_checkout(session)
+                return self.translation_service.translate(session, "checkout_cancelled")
+            return self.translation_service.translate(session, "checkout_confirm_retry")
+
+        # ---- Details stage: process current step --------------------------
+        return self._process_checkout_step(msg, msg_lower, session)
+
+    def _is_checkout_cancel(self, msg_lower: str) -> bool:
+        if msg_lower.strip() in {"cancel", "c", "stop", "quit", "never mind",
+                                 "forget it", "ሰርዝ", "አቁም", "ተወው"}:
+            return True
+        if msg_lower.startswith("/cancel"):
+            return True
+        return False
+
+    def _reset_checkout(self, session):
+        session.checkout_state = None
+        session.checkout_step = 0
+        session.checkout_pending = False
+        session.checkout_data = {}
+
+    def _process_checkout_step(self, msg: str, msg_lower: str, session) -> str:
+        step = session.checkout_step
+        data = session.checkout_data
+
+        if step == 0:
+            # Name
+            name = msg.strip().strip('"')
+            if len(name) < 2:
+                return self.translation_service.translate(session, "checkout_invalid_name")
+            data["name"] = name
+            session.checkout_step = 1
+            return self.translation_service.translate(session, "checkout_ask_phone", name=name)
+
+        if step == 1:
+            # Phone
+            digits = re.sub(r"\D", "", msg)
+            if len(digits) < 9:
+                return self.translation_service.translate(session, "checkout_invalid_phone")
+            data["phone"] = msg.strip()
+            session.checkout_step = 2
+            return self.translation_service.translate(session, "checkout_ask_address")
+
+        if step == 2:
+            # Address
+            address = msg.strip()
+            if len(address) < 5:
+                return self.translation_service.translate(session, "checkout_invalid_address")
+            data["address"] = address
+            session.checkout_step = 3
+            return self.translation_service.translate(session, "checkout_ask_payment")
+
+        if step == 3:
+            # Payment method
+            method = self._match_payment_method(msg_lower)
+            if not method:
+                return self.translation_service.translate(session, "checkout_unknown_payment")
+            data["payment_method"] = method
+            session.checkout_state = "confirm"
+            return self._checkout_summary_card(session)
+
+        return self.translation_service.translate(session, "checkout_confirm_retry")
+
+    def _match_payment_method(self, msg_lower: str) -> Optional[str]:
+        """Map a user reply (number, English or Amharic name) to a payment method."""
+        if msg_lower.strip() in {"1", "1st", "first", "cod", "cash", "cash on delivery",
+                                 "በጥሬ ገንዘብ", "ካሽ", "cod ክፍያ"}:
+            return "Cash on Delivery"
+        if msg_lower.strip() in {"2", "2nd", "second", "telebirr", "tele birr",
+                                 "ቴሌብር", "ቴሌብር ክፍያ"}:
+            return "Telebirr"
+        if msg_lower.strip() in {"3", "3rd", "third", "cbe", "cbe birr", "cbe bir",
+                                 "ሲቢኢ", "ሲቢኢ ብር"}:
+            return "CBE Birr"
+        if msg_lower.strip() in {"4", "4th", "fourth", "amole", "amole birr",
+                                 "አሞሌ", "አሞሌ ብር"}:
+            return "Amole"
+        if msg_lower.strip() in {"5", "5th", "fifth", "card", "credit", "credit card",
+                                 "ባንክ ካርድ"}:
+            return "Credit Card"
+        if "telebirr" in msg_lower or "ቴሌብር" in msg_lower:
+            return "Telebirr"
+        if "amole" in msg_lower or "አሞሌ" in msg_lower:
+            return "Amole"
+        if "cbe" in msg_lower or "ሲቢኢ" in msg_lower:
+            return "CBE Birr"
+        if "cash" in msg_lower or "cod" in msg_lower or "ካሽ" in msg_lower:
+            return "Cash on Delivery"
+        if "card" in msg_lower or "credit" in msg_lower:
+            return "Credit Card"
+        return None
+
+    def _checkout_summary_card(self, session) -> str:
+        """Build the [CHECKOUT] review card shown at the confirm step."""
+        data = session.checkout_data
+        name = data.get("name") or ""
+        phone = data.get("phone") or ""
+        address = data.get("address") or ""
+        payment = data.get("payment_method") or ""
+
+        items = []
+        total = 0.0
+        if self.db is not None and hasattr(self.db, "get_cart_details"):
+            try:
+                details = self.db.get_cart_details(session.user_id)
+                for it in details.get("items") or []:
+                    subtotal = float(it.get("subtotal") or
+                                     (it.get("price", 0) * it.get("quantity", 1)))
+                    items.append((it.get("name") or "Item",
+                                  it.get("quantity", 1), subtotal))
+                    total += subtotal
+            except Exception:
+                items = []
+        if not items:
+            # Fallback: names from the in-memory cart with no prices
+            for n in (session.cart or []):
+                items.append((n, 1, 0.0))
+        total = total or sum(s for _, _, s in items)
+
+        item_lines = "\n".join(
+            f"Item: {n} × {qty} — {price:,.2f} ETB" for n, qty, price in items
+        ) if items else "Item: (empty)"
+
+        confirm = self.translation_service.translate(session, "checkout_confirm_prompt")
+        return (
+            "[CHECKOUT]\n"
+            "Step: confirm\n"
+            f"Name: {name}\n"
+            f"Phone: {phone}\n"
+            f"Address: {address}\n"
+            f"Payment: {payment}\n"
+            f"{item_lines}\n"
+            f"Total: {total:,.2f} ETB\n"
+            f"Prompt: {confirm}"
+        )
+
+    def _place_order(self, session) -> str:
+        """Persist the order via the DB and render the order card."""
+        if self.db is None or not hasattr(self.db, "create_order"):
+            self._reset_checkout(session)
+            return self.translation_service.translate(session, "checkout_db_offline")
+
+        order = self.db.create_order(session.user_id, session.checkout_data)
+        if not order:
+            self._reset_checkout(session)
+            return self.translation_service.translate(session, "checkout_db_offline")
+
+        order_id = order.get("id") or order.get("order_id")
+        session.last_order_id = order_id
+        items = self.order_service.get_order_items(order_id)
+        card = self.order_service.format_order_card(order, items, session)
+        self._reset_checkout(session)
+        return card
     
     def _handle_help(self, message: str, session) -> str:
         user_name = session.user_name or ""

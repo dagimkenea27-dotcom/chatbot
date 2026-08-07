@@ -48,6 +48,12 @@ const i18n = {
       const val = this.t(key);
       if (val && val !== key) el.title = val;
     });
+    // Apply aria-label translations
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      const key = el.dataset.i18nAriaLabel;
+      const val = this.t(key);
+      if (val && val !== key) el.setAttribute('aria-label', val);
+    });
     // Update html lang attribute
     document.getElementById('htmlRoot').lang = this._lang === 'am' ? 'am' : 'en';
     // Toggle Ethiopic font body class
@@ -323,6 +329,108 @@ function isOrderCard(text) {
   return text.startsWith('━━━') && !text.includes('PRODUCT SEARCH') && !isSupportCard(text);
 }
 
+/* Checkout card renderer */
+function isCheckoutCard(text) {
+  return text.startsWith('[CHECKOUT]');
+}
+
+function parseCheckoutCard(text) {
+  const data = { items: [] };
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('[')) continue;
+    if (t.startsWith('Step:')) data.step = t.replace('Step:', '').trim();
+    else if (t.startsWith('Name:')) data.name = t.replace('Name:', '').trim();
+    else if (t.startsWith('Phone:')) data.phone = t.replace('Phone:', '').trim();
+    else if (t.startsWith('Address:')) data.address = t.replace('Address:', '').trim();
+    else if (t.startsWith('Payment:')) data.payment = t.replace('Payment:', '').trim();
+    else if (t.startsWith('Total:')) data.total = t.replace('Total:', '').trim();
+    else if (t.startsWith('Prompt:')) data.prompt = t.replace('Prompt:', '').trim();
+    else if (t.startsWith('Item:')) data.items.push(t.replace('Item:', '').trim());
+  }
+  return data;
+}
+
+const _checkoutLinkHtml = '<a href="#" class="checkout-link" onclick="event.preventDefault(); document.getElementById(\'msgInput\').value=\'Checkout\'; document.getElementById(\'sendBtn\').click();">';
+function linkifyCheckout(html) {
+  return html
+    .replace(/<(code|strong)>([^<]*?\b)(checkout)\b([^<]*?)<\/\1>/gi, (m, tag, pre, word, post) =>
+      `<${tag}>${pre}${_checkoutLinkHtml}${word}</a>${post}</${tag}>`)
+    .replace(/(?<!<[^>]*)\b(checkout)\b(?![^<]*>)/gi, (m, word) =>
+      `${_checkoutLinkHtml}${word}</a>`);
+}
+
+function renderCheckoutCard(data) {
+  const safeName = escHtml(data.name || '');
+  const safePhone = escHtml(data.phone || '');
+  const safeAddress = escHtml(data.address || '');
+  const safePayment = escHtml(data.payment || '');
+  const safeTotal = escHtml(data.total || '');
+  const safePrompt = escHtml(data.prompt || '');
+  const itemsHtml = data.items.length
+    ? data.items.map(i => `<li>${escHtml(i)}</li>`).join('')
+    : '<li>—</li>';
+  return `
+    <div class="checkout-card">
+      <div class="checkout-card-header">
+        <span class="checkout-badge">${i18n.t('checkout_review_badge', '🛒 Review Your Order')}</span>
+      </div>
+      <div class="checkout-card-info">
+        <div class="checkout-row"><span>👤 ${i18n.t('name_label', 'Name')}</span><b>${safeName}</b></div>
+        <div class="checkout-row"><span>📞 ${i18n.t('phone_label', 'Phone')}</span><b>${safePhone}</b></div>
+        <div class="checkout-row"><span>📍 ${i18n.t('address_label', 'Address')}</span><b>${safeAddress}</b></div>
+        <div class="checkout-row"><span>💳 ${i18n.t('payment_label', 'Payment')}</span><b>${safePayment}</b></div>
+      </div>
+      <ul class="checkout-items">${itemsHtml}</ul>
+      <div class="checkout-total">💰 ${i18n.t('total_label', 'Total')}: <b>${safeTotal}</b></div>
+      ${safePrompt ? `<p class="checkout-prompt">${linkifyCheckout(safePrompt.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'))}</p>` : ''}
+    </div>`;
+}
+
+/* Cart card renderer */
+function isCartCard(text) {
+  return text.includes('[CART]');
+}
+
+function parseCartCard(text) {
+  const data = { items: [] };
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('[')) continue;
+    if (t.startsWith('Msg:')) data.msg = t.replace('Msg:', '').trim();
+    else if (t.startsWith('Total:')) data.total = t.replace('Total:', '').trim();
+    else if (t.startsWith('Prompt:')) data.prompt = t.replace('Prompt:', '').trim();
+    else if (t.startsWith('Item:')) data.items.push(t.replace('Item:', '').trim());
+  }
+  return data;
+}
+
+function renderCartCard(data) {
+  const safeTotal = escHtml(data.total || '');
+  const safePrompt = escHtml(data.prompt || '');
+  const safeMsg = escHtml(data.msg || '');
+  const removeLabel = i18n.t('cart_remove_btn', '✕ Remove');
+  const itemsHtml = data.items.length
+    ? data.items.map(i => {
+        const name = String(i).split(' × ')[0];
+        const safeName = escHtml(name);
+        return `<li class="cart-item-row"><span>${escHtml(i)}</span>` +
+               `<button type="button" class="cart-remove-btn" data-product-name="${safeName}" ` +
+               `title="${escHtml(removeLabel)}" onclick="removeCartClicked(this)">✕</button></li>`;
+      }).join('')
+    : '<li>—</li>';
+  return `
+    ${safeMsg ? `<p class="cart-msg">${safeMsg}</p>` : ''}
+    <div class="checkout-card">
+      <div class="checkout-card-header">
+        <span class="checkout-badge">${i18n.t('cart_badge', '🛒 Your Cart')}</span>
+      </div>
+      <ul class="checkout-items">${itemsHtml}</ul>
+      <div class="checkout-total">💰 ${i18n.t('total_label', 'Total')}: <b>${safeTotal}</b></div>
+      ${safePrompt ? `<p class="checkout-prompt">${linkifyCheckout(safePrompt.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'))}</p>` : ''}
+    </div>`;
+}
+
 /* Promo card renderer */
 function isPromoCard(text) {
   return text.includes('PROMO');
@@ -577,13 +685,102 @@ class GojoChat {
     this.typing = $('typingRow');
     this.lastProductQuery = localStorage.getItem('gojo_last_product_query') || '';
     this._inSupportMode = false;
+    this._unreadCount = 0;
+    this._initChatWindow();
     $('welcomeTs').textContent = nowTime();
     this._initLang();
     this._bind();
     this._restoreAiState();
+    this._refreshCartBadge();
   }
 
   _genId() { return 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
+
+  _initChatWindow() {
+    const saved = localStorage.getItem('gojo_chat_open');
+    const isOpen = saved === null ? true : saved === '1';
+    document.body.classList.toggle('chat-open', isOpen);
+    document.body.classList.toggle('chat-closed', !isOpen);
+    this._updateBubbleBadge();
+  }
+
+  _isChatOpen() {
+    return document.body.classList.contains('chat-open');
+  }
+
+  _setChatOpen(open) {
+    document.body.classList.toggle('chat-open', open);
+    document.body.classList.toggle('chat-closed', !open);
+    localStorage.setItem('gojo_chat_open', open ? '1' : '0');
+    if (open) {
+      this._unreadCount = 0;
+      this._updateBubbleBadge();
+      setTimeout(() => this.input.focus(), 350);
+    }
+  }
+
+  _updateBubbleBadge() {
+    const badge = $('chatBubbleCount');
+    if (!badge) return;
+    badge.hidden = this._unreadCount === 0;
+    badge.textContent = this._unreadCount > 99 ? '99+' : String(this._unreadCount);
+  }
+
+  _bumpUnread() {
+    this._unreadCount += 1;
+    this._updateBubbleBadge();
+  }
+
+  async _refreshCartBadge() {
+    const badge = $('cartCount');
+    if (!badge) return;
+    try {
+      const res = await fetch(`/api/cart/details/${encodeURIComponent(this.userId)}`);
+      if (!res.ok) throw new Error('cart fetch failed');
+      const data = await res.json();
+      const count = Array.isArray(data.items) ? data.items.length : 0;
+      badge.hidden = count === 0;
+      badge.textContent = count > 99 ? '99+' : String(count);
+    } catch (_) {
+      badge.hidden = true;
+    }
+  }
+
+  _showCart() {
+    if (!this._isChatOpen()) {
+      this._setChatOpen(true);
+    }
+    this.input.value = 'cart';
+    this.input.focus();
+    this.send();
+  }
+
+  _playNotifySound() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = this._audioCtx || (this._audioCtx = new Ctx());
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const makeTone = (freq, start, dur) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + dur + 0.05);
+      };
+      makeTone(880, now, 0.28);
+      makeTone(1174.66, now + 0.18, 0.32);
+    } catch (e) {
+      console.warn('Notification sound error:', e);
+    }
+  }
 
   async _initLang() {
     const savedLang = i18n.lang;
@@ -625,6 +822,11 @@ class GojoChat {
     $('clearBtn').addEventListener('click', async () => {
       await this._resetConversation();
     });
+    $('minimizeBtn').addEventListener('click', () => this._setChatOpen(false));
+    $('chatBubble').addEventListener('click', () => {
+      this._setChatOpen(!this._isChatOpen());
+    });
+    $('cartBtn').addEventListener('click', () => this._showCart());
     $('exitSupportBtn').addEventListener('click', async () => {
       this.input.value = 'exit';
       await this.send();
@@ -741,6 +943,7 @@ class GojoChat {
       await this._sleep(wait);
       this._setTyping(false);
       await this._appendBotWithDelay(data.response, 0, true);
+      this._refreshCartBadge();
     } catch (err) {
       this._setTyping(false);
       await this._appendBotWithDelay(i18n.t('connection_error', '⚠️ Connection error. Please try again.'), 500, false);
@@ -781,6 +984,10 @@ class GojoChat {
       </div>`;
     this.messages.appendChild(row);
     this._scroll();
+    if (!this._isChatOpen()) {
+      this._bumpUnread();
+      this._playNotifySound();
+    }
   }
 
   _appendBot(text) { return this._appendBotWithDelay(text, 0, false); }
@@ -791,8 +998,10 @@ class GojoChat {
     const isProducts = isProductCard(text);
     const isSupport = isSupportCard(text);
     const isPromo = isPromoCard(text);
+    const isCheckout = isCheckoutCard(text);
+    const isCart = isCartCard(text);
     row.className = 'msg-row bot' + (isProducts || isPromo ? ' wide' : '');
-    const useTypewriter = typewriter && !isProducts && !isOrderCard(text) && !isSupport && !isPromo;
+    const useTypewriter = typewriter && !isProducts && !isOrderCard(text) && !isSupport && !isPromo && !isCheckout && !isCart;
     let inner = '';
     if (isSupport) {
       inner = renderSupportCard(parseSupportCard(text));
@@ -801,6 +1010,10 @@ class GojoChat {
         this._setSupportMode(true);
         SupportPoller.start(this.userId, this);
       }, 600);
+    } else if (isCheckout) {
+      inner = renderCheckoutCard(parseCheckoutCard(text));
+    } else if (isCart) {
+      inner = renderCartCard(parseCartCard(text));
     } else if (isOrderCard(text)) {
       inner = renderOrderCard(parseOrderCard(text));
     } else if (isPromo) {
@@ -821,6 +1034,10 @@ class GojoChat {
     if (useTypewriter) {
       const bubble = row.querySelector('.bubble');
       await this._typewriter(bubble, text);
+    }
+    if (!this._isChatOpen()) {
+      this._bumpUnread();
+      this._playNotifySound();
     }
   }
 
@@ -847,10 +1064,11 @@ class GojoChat {
   _esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   _fmt(text) {
-    return this._esc(text)
+    const html = this._esc(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br>');
+    return linkifyCheckout(html);
   }
 }
 
@@ -882,6 +1100,7 @@ window.addCartClicked = async (btn, id) => {
     if (res.ok) {
       btn.innerHTML = i18n.t('cart_added', '✓ Added');
       btn.style.background = 'var(--green)';
+      window.gojoChatInstance._refreshCartBadge();
       setTimeout(() => {
         const cartMsg = i18n.t('cart_added_msg', '🛒 Added **{product}** to your cart! Type `checkout` when you\'re ready.').replace('{product}', name);
         window.gojoChatInstance.appendLocalBotMessage(cartMsg);
@@ -891,5 +1110,38 @@ window.addCartClicked = async (btn, id) => {
     console.error(err);
     btn.innerHTML = i18n.t('cart_failed', 'Failed'); btn.style.background = 'var(--red)';
     setTimeout(() => { btn.innerHTML = originalHtml; btn.style.background = ''; btn.disabled = false; }, 1500);
+  }
+};
+
+window.removeCartClicked = async (btn) => {
+  const chat = window.gojoChatInstance;
+  const name = btn.dataset.productName || '';
+  if (!name) return;
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '…';
+  try {
+    const res = await fetch('/api/cart/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: chat.userId, product: name })
+    });
+    if (!res.ok) throw new Error('Failed');
+    await chat._refreshCartBadge();
+    // Re-render the cart card in place from fresh details.
+    const details = await (await fetch(`/api/cart/details/${encodeURIComponent(chat.userId)}`)).json();
+    const items = (details.items || []).map(it =>
+      `${it.name} × ${it.quantity} — ${Number(it.subtotal || 0).toFixed(2)} ETB`);
+    const total = `${Number(details.total_price || 0).toFixed(2)} ETB`;
+    const card = btn.closest('.checkout-card');
+    if (card) {
+      const msg = i18n.t('cart_removed_msg', '✅ Removed {product} from your cart.').replace('{product}', name);
+      card.outerHTML = renderCartCard({ items, total, msg });
+    }
+    chat._scroll();
+  } catch (err) {
+    console.error(err);
+    btn.innerHTML = i18n.t('cart_failed', 'Failed');
+    setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 1500);
   }
 };

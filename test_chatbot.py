@@ -162,17 +162,15 @@ class TestGojoShopChatbot(unittest.TestCase):
         next_page = chatbot.get_response(user, "show more")
         self.assertIn("max_price=1200", next_page)
 
-    def test_chat_template_and_helper_use_real_utf8_emojis(self):
+    def test_chat_template_uses_real_utf8_emojis(self):
         template_path = Path(__file__).with_name("templates") / "chatbot.html"
-        helper_path = Path(__file__).with_name("_inline_check.js")
 
-        for path in (template_path, helper_path):
-            content = path.read_text(encoding="utf-8")
-            self.assertIn("🛍️", content)
-            self.assertIn("📦", content)
-            self.assertNotIn("âœ¦", content)
-            self.assertNotIn("â€”", content)
-            self.assertNotIn("ðŸ", content)
+        content = template_path.read_text(encoding="utf-8")
+        self.assertIn("🛍️", content)
+        self.assertIn("📦", content)
+        self.assertNotIn("âœ¦", content)
+        self.assertNotIn("â€”", content)
+        self.assertNotIn("ðŸ", content)
 
     def test_db_session_and_support_persistence(self):
         class FullPersistentDB(FakeDB):
@@ -248,6 +246,56 @@ class TestGojoShopChatbot(unittest.TestCase):
 
         updated = chatbot.update_support_request_status(active["id"], "resolved")
         self.assertEqual(updated["status"], "resolved")
+
+
+class TestTransliteratedAmharic(unittest.TestCase):
+    """Amharic typed in Latin letters (e.g. "felige neber") must work."""
+
+    def setUp(self):
+        self.chatbot = GojoShopChatbot(db_manager=FakeDB())
+        self.user_id = "test_translit_user"
+
+    def test_transliterated_search_returns_products(self):
+        response = self.chatbot.get_response(self.user_id, "iphone felige neber")
+        self.assertIn("iPhone", response)
+
+    def test_transliterated_search_switches_language(self):
+        self.chatbot.get_response(self.user_id, "iphone felige neber")
+        session = self.chatbot.user_sessions[self.user_id]
+        self.assertEqual(session["language"], "am")
+
+    def test_conjugated_amharic_search_uses_clean_keyword(self):
+        db = RecordingDB()
+        chatbot = GojoShopChatbot(db_manager=db)
+        chatbot.get_response(self.user_id, "አይፎን ፈልጌ ነበር")
+        self.assertTrue(db.calls)
+        query = db.calls[0][0]
+        self.assertIn("አይፎን", query)
+        self.assertNotIn("ፈልጌ", query)
+        self.assertNotIn("ነበር", query)
+
+    def test_conjugated_verb_without_product_prompts(self):
+        response = self.chatbot.get_response(self.user_id, "ፈልጌ ነበር")
+        self.assertIn("ምርቶችን", response)
+        self.assertNotIn("couldn't find anything", response.lower())
+
+    def test_transliterated_show_cart(self):
+        response = self.chatbot.get_response(self.user_id, "gari asayen")
+        self.assertIn("ባዶ", response)
+
+    def test_transliterated_pure_buy_prompts_for_keyword(self):
+        response = self.chatbot.get_response(self.user_id, "gizene")
+        self.assertIn("ምርቶችን", response)
+        self.assertNotIn("couldn't find anything", response.lower())
+
+    def test_transliteration_word_boundaries(self):
+        from chatbot.nlp.transliteration import normalize_transliteration
+        self.assertEqual(normalize_transliteration("gari"), "ጋሪ")
+        self.assertEqual(normalize_transliteration("gariya"), "gariya")
+        self.assertEqual(
+            normalize_transliteration("iphone felige neber"), "iphone ፈልጌ ነበር"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

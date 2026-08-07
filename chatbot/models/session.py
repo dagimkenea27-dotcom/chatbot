@@ -34,6 +34,10 @@ class Session:
     contact_count: int = 0
     complaint_count: int = 0
     faq_topics_seen: List[str] = field(default_factory=list)
+    checkout_state: Optional[str] = None
+    checkout_data: Dict = field(default_factory=dict)
+    checkout_step: int = 0
+    checkout_pending: bool = False
     
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -84,4 +88,8 @@ class Session:
             "contact_count": self.contact_count,
             "complaint_count": self.complaint_count,
             "faq_topics_seen": self.faq_topics_seen,
+            "checkout_state": self.checkout_state,
+            "checkout_data": self.checkout_data,
+            "checkout_step": self.checkout_step,
+            "checkout_pending": self.checkout_pending,
         }

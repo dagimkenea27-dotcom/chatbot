@@ -1,7 +1,11 @@
 # telegram_bot.py
+import re
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
 from chatbot import GojoShopChatbot
+from database import db
 from dotenv import load_dotenv
 import os
 
@@ -17,13 +21,19 @@ def _get_lang(user_id: str) -> str:
 def _set_lang(user_id: str, lang: str):
     _user_languages[user_id] = lang
 
+def _strip_bold(text: str) -> str:
+    """Convert **bold** markers into plain text (Telegram-safe)."""
+    return re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+
+
 class TelegramBot:
     def __init__(self, token: str):
         self.token = token
-        self.chatbot = GojoShopChatbot()
+        # Share the app's DatabaseManager so carts/orders/sessions persist
+        self.chatbot = GojoShopChatbot(db_manager=db)
         self.application = Application.builder().token(token).build()
         self.setup_handlers()
-    
+
     def setup_handlers(self):
         """Setup bot command and message handlers"""
         self.application.add_handler(CommandHandler("start",    self.start_command))
@@ -48,7 +58,103 @@ class TelegramBot:
                 ['❓ Help', '📞 Contact'],
             ]
         return ReplyKeyboardMarkup(rows, resize_keyboard=True)
-    
+
+    def _format_cart_card(self, text: str, lang: str) -> str:
+        """Render a [CART] card as friendly plain text."""
+        items, total, prompt, msg = [], "", "", ""
+        # The web bot may prefix the card with a natural intro line that
+        # carries a "Msg: ..." note on the same line (e.g. "Sure! Msg: ...").
+        marker = text.find("Msg:")
+        if marker != -1:
+            msg = text[marker + len("Msg:"):].splitlines()[0].strip()
+        start = text.find("[CART]")
+        body = text[start + len("[CART]"):] if start != -1 else text
+        for line in body.splitlines():
+            t = line.strip()
+            if t.startswith("Item:"):
+                items.append(t[len("Item:"):].strip())
+            elif t.startswith("Total:"):
+                total = t[len("Total:"):].strip()
+            elif t.startswith("Prompt:"):
+                prompt = t[len("Prompt:"):].strip()
+
+        header = "ጋሪዎ" if lang == "am" else "Your Cart"
+        lines = []
+        if msg:
+            lines.append(_strip_bold(msg))
+        lines.append(f"🛒 {header}")
+        lines += [f"• {it}" for it in items] or ["• —"]
+        if total:
+            lines.append(f"\n💰 Total: {total}")
+        if prompt:
+            lines.append(f"\n{_strip_bold(prompt)}")
+        return "\n".join(lines)
+
+    def _format_checkout_card(self, text: str, lang: str) -> str:
+        """Render a [CHECKOUT] review card as friendly plain text."""
+        data = {"name": "", "phone": "", "address": "", "payment": "",
+                "total": "", "prompt": "", "items": []}
+        for line in text.splitlines():
+            t = line.strip()
+            if t.startswith("Step:"):
+                continue
+            for key in ("Name", "Phone", "Address", "Payment", "Total", "Prompt"):
+                if t.startswith(key + ":"):
+                    data[key.lower()] = t[len(key) + 1:].strip()
+                    break
+            else:
+                if t.startswith("Item:"):
+                    data["items"].append(t[len("Item:"):].strip())
+
+        header = "ትዕዛዝ ማረጋገጫ" if lang == "am" else "Checkout Review"
+        lines = [f"📋 {header}"]
+        if data["name"]:
+            lines.append(f"👤 Name: {data['name']}")
+        if data["phone"]:
+            lines.append(f"📞 Phone: {data['phone']}")
+        if data["address"]:
+            lines.append(f"📍 Address: {data['address']}")
+        if data["payment"]:
+            lines.append(f"💳 Payment: {data['payment']}")
+        if data["items"]:
+            lines.append("")
+            lines += [f"• {it}" for it in data["items"]]
+        if data["total"]:
+            lines.append(f"\n💰 Total: {data['total']}")
+        if data["prompt"]:
+            lines.append(f"\n{_strip_bold(data['prompt'])}")
+        return "\n".join(lines)
+
+    def _format_response(self, response: str, lang: str) -> str:
+        """Convert structured cards / heavy markers into clean Telegram text."""
+        if "[CART]" in response:
+            return self._format_cart_card(response, lang)
+        if response.startswith("[CHECKOUT]"):
+            return self._format_checkout_card(response, lang)
+
+        # General cleanup for plain-text cards (search / order / promo / faq).
+        cleaned = []
+        for line in response.splitlines():
+            s = line.strip()
+            # Drop structured-card noise that only matters to the web renderer.
+            if (s.startswith("Product ID:") or s.startswith("Filters:")
+                    or s.startswith("HasMore:") or s.startswith("Image:")
+                    or s.startswith("Step:")):
+                continue
+            # Strip inline card markers (they can follow a personality intro).
+            s = re.sub(r"\b(PROMO|RECOMMENDATIONS|PRODUCT SEARCH)\b", "", s)
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            if s == "---":
+                s = ""
+            # Replace heavy box-drawing separators.
+            s = re.sub(r"━+", "—", s)
+            cleaned.append(s)
+
+        text = "\n".join(cleaned)
+        # Collapse 3+ consecutive blank lines down to one blank line.
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return _strip_bold(text)
+
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user_id = str(update.effective_user.id)
@@ -71,9 +177,9 @@ class TelegramBot:
                 "Use /lang to change language (e.g. /lang am for Amharic).\n\n"
                 "What can I help you with today?"
             )
-        
+
         await update.message.reply_text(welcome_message, reply_markup=reply_markup)
-    
+
     async def lang_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /lang [en|am] command to switch language."""
         user_id = str(update.effective_user.id)
@@ -154,33 +260,26 @@ class TelegramBot:
                 "• Shipping information\n\n"
                 "Just type your question!"
             )
-        
+
         await update.message.reply_text(help_text)
-    
+
     async def cart_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /cart command"""
+        """Handle /cart command — reuse the show_cart intent for a [CART] card."""
         user_id = str(update.effective_user.id)
         lang = _get_lang(user_id)
-        cart = self.chatbot.get_cart(user_id)
-        
-        if not cart:
-            msg = "🛒 ጋሪዎ ባዶ ነው። ለመግዛት ይጀምሩ! 🛍️" if lang == "am" else "🛒 Your cart is empty. Start shopping! 🛍️"
-            await update.message.reply_text(msg)
-        else:
-            cart_items = "\n".join([f"• {item}" for item in cart])
-            if lang == "am":
-                await update.message.reply_text(f"🛒 ጋሪዎ:\n\n{cart_items}\n\nጠቅላላ: ሂሳብ ሲከፍሉ ይሰላል")
-            else:
-                await update.message.reply_text(f"🛒 Your Cart:\n\n{cart_items}\n\nTotal: Calculate at checkout")
-    
+        self.chatbot._ensure_session(user_id)
+        response = self.chatbot.get_response(user_id, "cart")
+        await update.message.reply_text(self._format_response(response, lang))
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle user messages"""
         user_id = str(update.effective_user.id)
         message = update.message.text
+        lang = _get_lang(user_id)
 
         # Ensure language set in chatbot session matches Telegram language pref
         self.chatbot._ensure_session(user_id)
-        self.chatbot.user_sessions[user_id]["language"] = _get_lang(user_id)
+        self.chatbot.user_sessions[user_id]["language"] = lang
 
         # Detect quick-reply button presses and map them to English commands
         button_map_am = {
@@ -197,15 +296,16 @@ class TelegramBot:
         # Get response from chatbot (language is already in session)
         response = self.chatbot.get_response(user_id, message)
 
-        # Strip the heavy card format markers for Telegram (plain text is fine)
-        response = response.replace("━━━━━━━━━━━━━━━━━━━━━━", "—" * 10)
-        response = response.replace("━━━ PRODUCT SEARCH ━━━", "🔍 ውጤቶች:" if _get_lang(user_id) == "am" else "🔍 Search Results:")
-        response = response.replace("━━━ RECOMMENDATIONS ━━━", "💡 ምክሮች:" if _get_lang(user_id) == "am" else "💡 Recommendations:")
-        response = response.replace("━━━ HUMAN SUPPORT ━━━", "👤 " + ("ድጋፍ:" if _get_lang(user_id) == "am" else "Support:"))
-        response = response.replace("━━━━━━━━━━━━━━━━━━━━━━", "——————————")
+        # Route support-mode marker to a human-friendly note.
+        if response == "[SUPPORT_MODE]":
+            note = ("የድጋፍ ቡድናችን ምላሽ ይሰጥዎታል። እባክዎ ይጠብቁ። 🙏"
+                    if lang == "am" else
+                    "Your message has been passed to our support team. They will get back to you soon. 🙏")
+            await update.message.reply_text(note)
+            return
 
-        await update.message.reply_text(response)
-    
+        await update.message.reply_text(self._format_response(response, lang))
+
     def run(self):
         """Start the bot"""
         print("🤖 GojoShop Telegram Bot is running...")
