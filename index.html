@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" id="htmlRoot">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GojoShop.et 🛍️ — Smart Shopping Assistant</title>
+    <meta name="description"
+        content="Chat with GojoShop.et's AI assistant for product help, order tracking, and more." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="static/css/styles.css" />
+</head>
+
+<body>
+    <div class="chat-wrap" id="chatWrap">
+
+        <div class="chat-header">
+            <div class="brand-mark">G</div>
+            <div class="header-info">
+                <h1>GojoShop.et</h1>
+                <p><span class="status-dot"></span>Online - AI Shopping Assistant</p>
+            </div>
+            <div class="header-actions">
+                <!-- Language Selector -->
+                <div class="lang-selector" id="langSelector" aria-label="Language selector">
+                    <button class="lang-btn active" id="langBtnEn" data-lang="en" title="English"
+                        aria-pressed="true">EN</button>
+                    <span class="lang-divider">|</span>
+                    <button class="lang-btn" id="langBtnAm" data-lang="am" title="አማርኛ" aria-pressed="false">አማ</button>
+                </div>
+                <button class="header-btn" title="Clear chat" id="clearBtn" aria-label="Clear chat"
+                    data-i18n-title="clear_chat_tooltip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="date-sep" id="dateSepToday" data-i18n="date_sep_today">Today</div>
+
+            <div class="msg-row bot" id="welcomeMsg">
+                <div class="bot-icon">S</div>
+                <div class="bot-content">
+                    <div class="welcome-card">
+                        <div class="welcome-hero">
+                            <h2 id="welcomeTitle" data-i18n="welcome_title">Welcome to GojoShop.et</h2>
+                            <p id="welcomeDesc" data-i18n="welcome_desc">Your personal shopping assistant - search
+                                products, track
+                                orders, and get help instantly.</p>
+                        </div>
+                        <div class="feature-grid">
+                            <div class="feature-item"><span class="feature-icon">🔍</span><span id="featureSearch"
+                                    data-i18n="feature_search">Search products by name or keyword</span></div>
+                            <div class="feature-item"><span class="feature-icon">📦</span><span id="featureTrack"
+                                    data-i18n="feature_track">Track orders with your Order ID</span></div>
+                            <div class="feature-item"><span class="feature-icon">🚚</span><span id="featureShipping"
+                                    data-i18n="feature_shipping">Shipping &amp; delivery info</span></div>
+                            <div class="feature-item"><span class="feature-icon">💳</span><span id="featurePayment"
+                                    data-i18n="feature_payment">Payment methods &amp; checkout</span></div>
+                        </div>
+                        <div class="welcome-cta" id="welcomeCta" data-i18n="welcome_cta">Try a quick action below, or
+                            type what
+                            you're looking for.</div>
+                    </div>
+                    <div class="ts" id="welcomeTs"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support mode banner (hidden by default) -->
+        <div class="support-banner" id="supportBanner">
+            <div class="support-banner-dot"></div>
+            <span class="support-banner-label" id="supportBannerLabel" data-i18n="support_banner_label">🟢 Connected to
+                Support Agent — type your message below</span>
+            <button class="support-exit-btn" id="exitSupportBtn" data-i18n="exit_support_btn">End Chat</button>
+        </div>
+
+        <div class="typing-row" id="typingRow">
+            <div class="bot-icon">R</div>
+            <div class="typing-bubble">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </div>
+
+        <div class="quick-replies" id="quickReplies">
+            <button class="qr-btn" data-msg="Track my order" data-i18n="qr_track_order">📦 Track Order</button>
+            <button class="qr-btn" data-msg="Shipping info" data-i18n="qr_shipping">🚚 Shipping</button>
+            <button class="qr-btn" data-msg="Payment methods" data-i18n="qr_payment">💳 Payment</button>
+            <button class="qr-btn" data-msg="Talk to human" data-i18n="qr_human_support">👤 Human Support</button>
+            <button class="qr-btn" data-msg="Help" data-i18n="qr_help">🆘 Help</button>
+        </div>
+
+        <div class="input-bar">
+            <div class="input-wrap">
+                <input class="msg-input" id="msgInput" type="text"
+                    placeholder="Search products, track orders, ask anything..."
+                    data-i18n-placeholder="input_placeholder" autocomplete="off" />
+                <button class="send-btn" id="sendBtn" title="Send" aria-label="Send message">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/js/chatbot.js" defer></script>
+</body>
+
+</html>
