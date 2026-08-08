@@ -34,5 +34,8 @@ Thumbs.db
 
 # Json files
 
+chatbot.pub
+wsgi_test.txt
+
 chatbot/data/promotions.json
 
