@@ -117,6 +117,7 @@ web renderer. Commands: `/start`, `/help`, `/cart`, `/lang en|am`.
 - `database.py` — MySQL access (products, sessions, cart, orders, support)
 - `chatbot/` — chatbot core, intents, session model, services (product, FAQ, promotion, translation, personality, conversation)
 - `telegram_bot.py` — optional Telegram interface
-- `templates/` — `chatbot.html` (chat UI), `support_admin.html` (support dashboard)
+- `templates/` — `support_admin.html` (support dashboard)
+- `index.html` — chat UI (single canonical page, served at `/`)
 - `static/` — CSS and JS for the chat UI
 - `setup_database.sql` — creates the `gojoshopchat` schema

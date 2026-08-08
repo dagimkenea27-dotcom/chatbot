@@ -163,7 +163,7 @@ class TestGojoShopChatbot(unittest.TestCase):
         self.assertIn("max_price=1200", next_page)
 
     def test_chat_template_uses_real_utf8_emojis(self):
-        template_path = Path(__file__).with_name("templates") / "chatbot.html"
+        template_path = Path(__file__).with_name("index.html")
 
         content = template_path.read_text(encoding="utf-8")
         self.assertIn("🛍️", content)

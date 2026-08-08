@@ -219,9 +219,12 @@ class GojoShopChatbot:
         
         # ---- ACTIVE CHECKOUT FLOW ----
         # While the checkout state machine awaits input, route every reply to
-        # the checkout handler (except explicit escapes to a human / help).
+        # the checkout handler (except explicit escapes to a human / help, and
+        # cart management intents — a user may want to remove a mistakenly
+        # added item (or review the cart) even at the confirm step, and the
+        # removal must hit the DB BEFORE the order is placed).
         if getattr(session, "checkout_pending", False) and intent not in (
-            "human_support", "help"
+            "human_support", "help", "remove_from_cart", "show_cart"
         ):
             intent = "checkout"
         
@@ -824,11 +827,19 @@ class GojoShopChatbot:
             self.cart_service.remove_item(session.user_id, name)
             session.cart = [n for n in session.cart if n != name]
             new_items = self._load_cart_items(session)
-            new_total = sum(sub for _, _, sub in new_items)
             msg = self.translation_service.translate(
                 session, "cart_remove_success", product=name)
             if not new_items:
+                # Nothing left to order — abandon the in-flight checkout so a
+                # later "yes" can't place an empty/stale order.
+                self._reset_checkout(session)
                 return msg
+            if (getattr(session, "checkout_pending", False)
+                    and session.checkout_state == "confirm"):
+                # Mid-review removal: re-render the confirm card with the
+                # remaining items so the placed order excludes the removed one.
+                return self._checkout_summary_card(session)
+            new_total = sum(sub for _, _, sub in new_items)
             return self._render_cart_card(new_items, new_total,
                                           prompt=prompt, msg=msg)
 

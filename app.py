@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from chatbot.chatbot_core import GojoShopChatbot
 from database import db
@@ -33,7 +33,9 @@ else:
 
 @app.route('/')
 def index():
-    return render_template('chatbot.html')
+    # Serve the single canonical chat page (also served directly by the web
+    # server from the project root) so every entry point shows the same UI.
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
 
 
 @app.route('/favicon.ico')

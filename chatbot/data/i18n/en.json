@@ -53,8 +53,6 @@
     "phone_label": "Phone",
     "name_label": "Name",
     "address_label": "Address",
-    "payment_label": "Payment",
-    "total_label": "Total",
     "checkout_review_badge": "🛒 Review Your Order",
     "cart_badge": "🛒 Your Cart",
     "hours_label": "Hours",
@@ -74,6 +72,9 @@
     "cart_failed": "Failed",
     "cart_remove_btn": "✕ Remove",
     "cart_removed_msg": "✅ Removed {product} from your cart.",
+    "clear_cart_btn": "Clear Cart",
+    "clear_cart_tooltip": "Clear all items in cart",
+    "cart_cleared_msg": "🛒 Your cart has been cleared.",
     "active_support_ended": "✅ Support session has ended. How else can I help you?"
   },
   "bot": {

@@ -72,6 +72,9 @@
     "cart_failed": "አልተሳካም",
     "cart_remove_btn": "✕ አስወግድ",
     "cart_removed_msg": "✅ {product} ከጋሪዎ ተወግዷል።",
+    "clear_cart_btn": "ጋሪ አጽዳ",
+    "clear_cart_tooltip": "ሁሉንም እቃዎች አጽዳ",
+    "cart_cleared_msg": "🛒 ጋሪዎ ጸድቷል።",
     "active_support_ended": "✅ የድጋፍ ክፍለ-ጊዜው ተጠናቋል። በሌላ በምን ልርዳዎት?"
   },
   "bot": {

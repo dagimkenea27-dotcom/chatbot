@@ -409,6 +409,70 @@ class TestCartRemove(unittest.TestCase):
         self.assertIn("Removed", response)
 
 
+class TestRemoveDuringCheckout(unittest.TestCase):
+    """A chat removal while the checkout state machine awaits input must hit
+    the DB so the placed order excludes the removed item (regression: the
+    active-checkout override used to swallow remove/show-cart intents)."""
+
+    def setUp(self):
+        self.db = CheckoutFakeDB()
+        self.chatbot = GojoShopChatbot(db_manager=self.db)
+        self.user = "remove_checkout_user_1"
+        self.chatbot.add_to_cart(self.user, "iPhone 15")
+        self.chatbot.add_to_cart(self.user, "iPhone Case")
+
+    def _confirm(self):
+        self.chatbot.get_response(self.user, "checkout")
+        self.chatbot.get_response(self.user, "Abebe Girma")
+        self.chatbot.get_response(self.user, "+251911000000")
+        self.chatbot.get_response(self.user, "Addis Ababa")
+        r = self.chatbot.get_response(self.user, "Telebirr")
+        self.assertIn("[CHECKOUT]", r)
+        self.assertEqual(self.chatbot.user_sessions[self.user].checkout_state,
+                         "confirm")
+        return r
+
+    def test_remove_at_confirm_excludes_item_from_order(self):
+        self._confirm()
+        r = self.chatbot.get_response(self.user, "remove iPhone 15")
+        self.assertIn("[CHECKOUT]", r)
+        self.assertIn("iPhone Case", r)
+        self.assertNotIn("iPhone 15", r)
+        self.assertEqual(len(self.chatbot.get_cart(self.user)), 1)
+
+        order_card = self.chatbot.get_response(self.user, "yes")
+        self.assertIn("Order #", order_card)
+        self.assertIn("iPhone Case", order_card)
+        self.assertNotIn("iPhone 15", order_card)
+
+    def test_remove_reference_at_confirm(self):
+        self._confirm()
+        r = self.chatbot.get_response(self.user, "remove the last item")
+        self.assertIn("[CHECKOUT]", r)
+        self.assertIn("iPhone 15", r)
+        self.assertNotIn("iPhone Case", r)
+        self.assertEqual(len(self.chatbot.get_cart(self.user)), 1)
+
+    def test_remove_all_at_confirm_resets_checkout(self):
+        self._confirm()
+        self.chatbot.get_response(self.user, "remove iPhone 15")
+        r = self.chatbot.get_response(self.user, "remove iPhone Case")
+        self.assertIn("removed", r.lower())
+        session = self.chatbot.user_sessions[self.user]
+        self.assertIsNone(session.checkout_state)
+        self.assertFalse(session.checkout_pending)
+        self.assertEqual(len(self.chatbot.get_cart(self.user)), 0)
+
+    def test_remove_during_details_stage(self):
+        self.chatbot.get_response(self.user, "checkout")
+        r = self.chatbot.get_response(self.user, "remove iPhone 15")
+        self.assertIn("Item: iPhone Case", r)
+        self.assertNotIn("Item: iPhone 15", r)
+        self.assertEqual(len(self.chatbot.get_cart(self.user)), 1)
+        # Checkout remains pending; the user can continue at the same step.
+        self.assertTrue(self.chatbot.user_sessions[self.user].checkout_pending)
+
+
 class DegradedCartDetailsDB(CheckoutFakeDB):
     """Mimics a live DB where get_cart_details returns empty (query error)
     while item names are still resolvable — prices must not be blank."""

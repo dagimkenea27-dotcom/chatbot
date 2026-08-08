@@ -628,12 +628,46 @@ body.lang-am .feature-item {
 
 .checkout-card-header {
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .checkout-badge {
   font-weight: 700;
   color: #047857;
   font-size: 13.5px;
+}
+
+.cart-clear-btn {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.cart-clear-btn:hover:not(:disabled) {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+.cart-clear-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.cart-clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .checkout-card-info {

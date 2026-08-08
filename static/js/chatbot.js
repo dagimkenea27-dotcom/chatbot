@@ -367,13 +367,23 @@ function renderCheckoutCard(data) {
   const safePayment = escHtml(data.payment || '');
   const safeTotal = escHtml(data.total || '');
   const safePrompt = escHtml(data.prompt || '');
+  const removeLabel = i18n.t('cart_remove_btn', '✕ Remove');
+  const clearLabel = i18n.t('clear_cart_btn', 'Clear Cart');
+  const clearTooltip = i18n.t('clear_cart_tooltip', 'Clear all items in cart');
   const itemsHtml = data.items.length
-    ? data.items.map(i => `<li>${escHtml(i)}</li>`).join('')
+    ? data.items.map(i => {
+        const name = String(i).split(' × ')[0];
+        const safeItemName = escHtml(name);
+        return `<li class="cart-item-row"><span>${escHtml(i)}</span>` +
+               `<button type="button" class="cart-remove-btn" data-product-name="${safeItemName}" ` +
+               `title="${escHtml(removeLabel)}" onclick="removeCartClicked(this)">✕</button></li>`;
+      }).join('')
     : '<li>—</li>';
   return `
     <div class="checkout-card">
       <div class="checkout-card-header">
         <span class="checkout-badge">${i18n.t('checkout_review_badge', '🛒 Review Your Order')}</span>
+        ${data.items.length ? `<button type="button" class="cart-clear-btn" title="${escHtml(clearTooltip)}" onclick="clearCartClicked(this)">✕ ${escHtml(clearLabel)}</button>` : ''}
       </div>
       <div class="checkout-card-info">
         <div class="checkout-row"><span>👤 ${i18n.t('name_label', 'Name')}</span><b>${safeName}</b></div>
@@ -410,6 +420,8 @@ function renderCartCard(data) {
   const safePrompt = escHtml(data.prompt || '');
   const safeMsg = escHtml(data.msg || '');
   const removeLabel = i18n.t('cart_remove_btn', '✕ Remove');
+  const clearLabel = i18n.t('clear_cart_btn', 'Clear Cart');
+  const clearTooltip = i18n.t('clear_cart_tooltip', 'Clear all items in cart');
   const itemsHtml = data.items.length
     ? data.items.map(i => {
         const name = String(i).split(' × ')[0];
@@ -424,6 +436,7 @@ function renderCartCard(data) {
     <div class="checkout-card">
       <div class="checkout-card-header">
         <span class="checkout-badge">${i18n.t('cart_badge', '🛒 Your Cart')}</span>
+        ${data.items.length ? `<button type="button" class="cart-clear-btn" title="${escHtml(clearTooltip)}" onclick="clearCartClicked(this)">✕ ${escHtml(clearLabel)}</button>` : ''}
       </div>
       <ul class="checkout-items">${itemsHtml}</ul>
       <div class="checkout-total">💰 ${i18n.t('total_label', 'Total')}: <b>${safeTotal}</b></div>
@@ -1128,7 +1141,6 @@ window.removeCartClicked = async (btn) => {
     });
     if (!res.ok) throw new Error('Failed');
     await chat._refreshCartBadge();
-    // Re-render the cart card in place from fresh details.
     const details = await (await fetch(`/api/cart/details/${encodeURIComponent(chat.userId)}`)).json();
     const items = (details.items || []).map(it =>
       `${it.name} × ${it.quantity} — ${Number(it.subtotal || 0).toFixed(2)} ETB`);
@@ -1136,7 +1148,47 @@ window.removeCartClicked = async (btn) => {
     const card = btn.closest('.checkout-card');
     if (card) {
       const msg = i18n.t('cart_removed_msg', '✅ Removed {product} from your cart.').replace('{product}', name);
-      card.outerHTML = renderCartCard({ items, total, msg });
+      const isCheckout = card.querySelector('.checkout-card-info');
+      if (isCheckout && items.length > 0) {
+        const rows = card.querySelectorAll('.checkout-row b');
+        const nameVal = rows[0]?.textContent || '';
+        const phoneVal = rows[1]?.textContent || '';
+        const addressVal = rows[2]?.textContent || '';
+        const paymentVal = rows[3]?.textContent || '';
+        const promptVal = card.querySelector('.checkout-prompt')?.textContent || '';
+        card.outerHTML = renderCheckoutCard({
+          name: nameVal, phone: phoneVal, address: addressVal, payment: paymentVal,
+          items, total, prompt: promptVal
+        });
+      } else {
+        card.outerHTML = renderCartCard({ items, total, msg });
+      }
+    }
+    chat._scroll();
+  } catch (err) {
+    console.error(err);
+    btn.innerHTML = i18n.t('cart_failed', 'Failed');
+    setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 1500);
+  }
+};
+
+window.clearCartClicked = async (btn) => {
+  const chat = window.gojoChatInstance;
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '…';
+  try {
+    const res = await fetch('/api/cart/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: chat.userId })
+    });
+    if (!res.ok) throw new Error('Failed');
+    await chat._refreshCartBadge();
+    const card = btn.closest('.checkout-card');
+    if (card) {
+      const msg = i18n.t('cart_cleared_msg', '🛒 Your cart has been cleared.');
+      card.outerHTML = renderCartCard({ items: [], total: '0.00 ETB', msg });
     }
     chat._scroll();
   } catch (err) {
