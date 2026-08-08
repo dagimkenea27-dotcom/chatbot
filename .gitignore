@@ -31,7 +31,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
+tmp/
 # Json files
 
 chatbot.pub
@@ -39,3 +39,4 @@ wsgi_test.txt
 
 chatbot/data/promotions.json
 
+tmp/
